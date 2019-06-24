@@ -5,10 +5,13 @@ import math
 from py2neo import Graph
 import requests
 
+
+
+
 # utils
 # =====
 import logging
-logging.basicConfig(filename='./app.log',level=logging.WARNING)
+logging.basicConfig(filename='./app.log',level=logging.WARNING,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 
 import collections
 def flatten(d, parent_key='', sep='_'):
@@ -21,11 +24,16 @@ def flatten(d, parent_key='', sep='_'):
             items.append((new_key, v))
     return dict(items)
 
+
+
 # app and db
 # ==========
 app = Flask(__name__)
 
 g = Graph("bolt://neo4j:7687", auth=('neo4j', 'pass'))
+
+
+
 
 # routes
 # ======
@@ -48,6 +56,9 @@ def route_b():
     pass_through_blocks(length=1)
     return "ok"
 
+
+
+
 # funcs
 # =====
 def pass_through_channels(user_id=33234, channel_test=None):
@@ -56,6 +67,8 @@ def pass_through_channels(user_id=33234, channel_test=None):
     total_pages = 1
     
     while (current_page < total_pages):
+        # fetch API for user
+        logging.warning("Fetching API: user {} page {}/{}".format(str(user_id), str(current_page + 1), str(total_pages)))
         response = requests.request(
             "GET",
             "https://api.are.na/v2/users/" + str(user_id) + "/channels",
@@ -65,6 +78,8 @@ def pass_through_channels(user_id=33234, channel_test=None):
         )
         r = response.json()
         
+        # fetch db all channels
+        logging.warning("Fetching db: all channels")
         db_channels = g.run(
             "MATCH (a:Channel) RETURN a.id as id, a.updated_at as updated_at, a.added_to_at as added_to_at"
         ).data()
@@ -75,26 +90,27 @@ def pass_through_channels(user_id=33234, channel_test=None):
             # test mode
             to_test=[142063, 419718, 422143, 422144, 420907, 420906]
             if channel['id'] not in to_test:
-                logging.warning("Channel skipped in testing {} {}".format(str(channel['id']), str(channel['title'])))
+                logging.warning("\tChannel skipped in testing: {} {}".format(str(channel['id']), str(channel['title'])))
                 continue
 
-            if channel['id'] not in db_channels_ids:
+            elif channel['id'] not in db_channels_ids:
                 # create channel in db
-                data = channel
-                del data['contents']
-                del data['user']
+                logging.warning("\tChannel to create: {} {}".format(str(channel['id']), str(channel['title'])))
+                props = channel
+                del props['contents']
+                props = flatten(props)
                 res = g.run(
-                    "CREATE (a:Channel {data}) RETURN id(a) as id",
-                    data=data
+                    "CREATE (a:Channel {props}) RETURN id(a) as id",
+                    props=props
                 ).data()
-                logging.warning("Channel created {} {} - neo4j id {}".format(str(channel['id']), str(channel['title']), str(res[0]['id'])))
+                logging.warning("\tDone: node id {}".format(str(res[0]['id'])))
 
                 # create/add/update blocks in channel
+                logging.warning("\tChannel pass thru blocks starting: {} {}".format(str(channel['id']), str(channel['title'])))
                 pass_through_blocks(channel['id'], channel['length'])
-
                 continue
             
-            if channel['id'] in db_channels_ids:
+            elif channel['id'] in db_channels_ids:
                 # collect update information
                 db_updated_at = [ o['updated_at'] for o in db_channels if o['id'] == channel['id'] ][0]
                 db_updated_at = datetime.strptime(db_updated_at, '%Y-%m-%dT%H:%M:%S.%fZ')
@@ -105,33 +121,40 @@ def pass_through_channels(user_id=33234, channel_test=None):
 
                 if ((updated_at>db_updated_at) or (added_to_at>db_added_to_at)):
                     # update channel props
-                    data = channel
-                    del data['contents']
-                    del data['user']
+                    logging.warning("\tChannel to update props: {} {}".format(str(channel['id']), str(channel['title'])))
+                    props = channel
+                    del channel['contents']
+                    props = flatten(props)
                     res = g.run(
-                        "MATCH (a:Channel {id: {id}}) SET a+={data} RETURN id(a) as id",
+                        "MATCH (a:Channel {id: {id}}) SET a+={props} RETURN id(a) as id",
                         id=channel['id'],
-                        data=data
+                        props=props
                     ).data()
-                    logging.warning("Channel info updated {} {} - neo4j id {}".format(str(channel['id']), str(channel['title']), str(res[0]['id'])))
+                    logging.warning("\tDone: node id {}".format(str(res[0]['id'])))
 
                     # create/add/update blocks in channel
+                    logging.warning("\tChannel pass thru blocks starting: {} {}".format(str(channel['id']), str(channel['title'])))
                     pass_through_blocks(channel['id'], channel['length'])
-                    logging.warning("Channel blocks updated {} {}".format(str(channel['id']), str(channel['title']), str(res[0]['id'])))
                     continue
 
-            logging.warning("Channel nothing to do {} {}".format(str(channel['id']), str(channel['title'])))
+                else:
+                    logging.warning("\tChannel w nothing to do: {} {}".format(str(channel['id']), str(channel['title'])))
 
         current_page = r['current_page']
         total_pages = r['total_pages']
 
+
+
+
 def pass_through_blocks(channel_id=142063, length=None):
+    assert length is not None
     per = 100
     current_page = 0
     total_pages = math.ceil(length / per)
     
     while (current_page < total_pages):
-        # get channel contents
+        # fetch API channel contents
+        logging.warning("\tFetching API: channel {} page {}/{} ({})".format(str(channel_id), str(current_page + 1), str(total_pages), str(length)))
         response = requests.request(
             "GET",
             "http://api.are.na/v2/channels/" + str(channel_id) + "/contents",
@@ -141,7 +164,8 @@ def pass_through_blocks(channel_id=142063, length=None):
         )
         r = response.json()
 
-        # get blocks already in db
+        # fetch db get blocks already in db
+        logging.warning("\tFetching db: channel {}".format(str(channel_id)))
         db_blocks = g.run(
             """MATCH (a:Block), (a)-[b:CONNECTS_TO]-(:Channel {id: {channel_id}})
             RETURN a.id as id, a.updated_at as updated_at, b.id as connection_id""",
@@ -154,30 +178,31 @@ def pass_through_blocks(channel_id=142063, length=None):
             
             if block['id'] not in db_blocks_ids:
                 # create block
-                data = block
-                # del data['user']
-                data = flatten(data)
+                logging.warning("\t\tBlock to create: {} {}".format(str(block['class']), str(block['id'])))
+                props = block
+                props = flatten(props)
                 res = g.run(
-                    "CREATE (a:Block {data}) RETURN id(a) as id", 
-                    data=data
+                    "CREATE (a:Block {props}) RETURN id(a) as id", 
+                    props=props
                 ).data()
-                logging.warning("\tBlock created {} {} - neo4j id {}".format(str(block['id']), str(block['title']), str(res[0]['id'])))
+                logging.warning("\t\tDone: node id {}".format(str(res[0]['id'])))
 
             if block['connection_id'] not in db_connection_ids:
                 # create connection
-                data = {
+                logging.warning("\t\t\tConnection to create: block {} -> channel {}".format(str(block['id']), str(channel_id)))
+                props = {
                     'id': block['connection_id'],
                     'connected_at': block['connected_at'],
                 }
                 res = g.run(
                     """MATCH (b:Block {id: {block_id}}), (c:Channel {id: {channel_id}})
-                    CREATE (b)-[r:CONNECTS_TO {data}]->(c)
+                    CREATE (b)-[r:CONNECTS_TO {props}]->(c)
                     RETURN id(r) as id""",
-                    data=data,
+                    props=props,
                     block_id=block['id'],
                     channel_id=channel_id,
                 ).data()
-                logging.warning("\t\tConnection created block{} channel{} - neo4j id {}".format(str(block['id']), str(channel_id), str(res[0]['id'])))
+                logging.warning("\t\t\tDone: rel id {}".format(str(res[0]['id'])))
 
             if block['id'] in db_blocks_ids:
                 # collect update information
@@ -187,17 +212,20 @@ def pass_through_blocks(channel_id=142063, length=None):
 
                 if (updated_at>db_updated_at):
                     # update block props
-                    data = block
-                    # del data['user']
-                    data = flatten(data)
+                    logging.warning("\t\tBlock props to update: {} {}".format(str(block['class']), str(block['id'])))
+                    props = block
+                    props = flatten(props)
                     res = g.run(
-                        "MATCH (a:Block {id: {id}}) SET a+={data} RETURN id(a) as id",
+                        "MATCH (a:Block {id: {id}}) SET a+={props} RETURN id(a) as id",
                         id=block['id'],
-                        data=data
+                        props=props
                     ).data()
-                    logging.warning("\tBlock info updated {} {} - neo4j id {}".format(str(block['id']), str(block['title']), str(res[0]['id'])))
+                    logging.warning("\t\tDone: node id {}".format(str(res[0]['id'])))
 
         current_page += 1
+
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
