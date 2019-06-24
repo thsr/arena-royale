@@ -39,7 +39,7 @@ g = Graph("bolt://neo4j:7687", auth=('neo4j', 'pass'))
 # ======
 @app.route('/del')
 def route_del():
-    open('./app.log', 'w').close()
+    # open('./app.log', 'w').close()
     g.run("match (n)-[r]-() delete r, n")
     g.run("match (n) delete n")
     do_user_channels()
@@ -47,7 +47,7 @@ def route_del():
 
 @app.route('/a')
 def route_a():
-    open('./app.log', 'w').close()
+    # open('./app.log', 'w').close()
     do_user_channels()
     return "ok"
 
@@ -66,6 +66,13 @@ def do_user_channels(user_id=33234):
     current_page = 0
     total_pages = 1
     
+    db_channels = g.run(
+        """MATCH (c:Channel)
+        RETURN c.id as id, c.updated_at as updated_at, c.added_to_at as added_to_at
+        """
+    ).data()
+    db_channel_ids =  [o['id'] for o in db_channels ]
+
     while (current_page < total_pages):
         # fetch API for user
         logging.warning("User {}: to fetch all channels API: page {}/{}".format(str(user_id), str(current_page + 1), str(total_pages)))
@@ -81,12 +88,26 @@ def do_user_channels(user_id=33234):
         for channel in r['channels']:
 
             # test mode
-            if False:
-                to_test=[142063, 419718, 422143, 422144, 420907, 420906, 418567, 418541]
+            if True:
+                to_test=[142063, 419718, 422143, 422144]
                 if channel['id'] not in to_test:
                     logging.warning("Channel {} {}: to skip in testing".format(str(channel['id']), str(channel['title'])))
                     continue
 
+            # skip channel if not newly updated or added to
+            if (channel['id'] in db_channel_ids):
+                old_updated_at = [ o['updated_at'] for o in db_channels if o['id'] == channel['id'] ][0]
+                old_updated_at = datetime.strptime(old_updated_at, '%Y-%m-%dT%H:%M:%S.%fZ')
+                old_added_to_at = [ o['added_to_at'] for o in db_channels if o['id'] == channel['id'] ][0]
+                old_added_to_at = datetime.strptime(old_added_to_at, '%Y-%m-%dT%H:%M:%S.%fZ')
+                new_updated_at = datetime.strptime(channel['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                new_added_to_at = datetime.strptime(channel['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+
+                if ((old_updated_at == new_updated_at) and (old_added_to_at == new_added_to_at)):
+                    logging.warning("Channel {} {}: nothing to update or add".format(str(channel['id']), str(channel['title'])))
+                    continue
+
+            # merge channel
             logging.warning("Channel {} {}: to merge ".format(str(channel['id']), str(channel['title'])))
             props = channel
             if 'contents' in props:
@@ -100,6 +121,7 @@ def do_user_channels(user_id=33234):
                 props=props
             ).stats()
 
+            # go thru channel's blocks
             if (channel['length'] != 0):
                 logging.warning("Channel {} {}: to start going through all blocks".format(str(channel['id']), str(channel['title'])))
                 do_channel_blocks(channel['id'], channel['title'], channel['length'])
