@@ -26,6 +26,7 @@ def flatten(d, parent_key='', sep='_'):
 
 
 
+
 # app and db
 # ==========
 app = Flask(__name__)
@@ -39,9 +40,8 @@ g = Graph("bolt://neo4j:7687", auth=('neo4j', 'pass'))
 # ======
 @app.route('/del')
 def route_del():
-    # open('./app.log', 'w').close()
-    g.run("match (n)-[r]-() delete r, n")
-    g.run("match (n) delete n")
+    open('./app.log', 'w').close()
+    g.run("MATCH (n) DETACH DELETE n")
     do_user_channels()
     return "ok"
 
@@ -75,7 +75,7 @@ def do_user_channels(user_id=33234):
 
     while (current_page < total_pages):
         # fetch API for user
-        logging.warning("User {}: to fetch all channels API: page {}/{}".format(str(user_id), str(current_page + 1), str(total_pages)))
+        logging.warning(f"User {str(user_id)}: fetching all channels API: page {str(current_page + 1)}/{str(total_pages)}")
         response = requests.request(
             "GET",
             "https://api.are.na/v2/users/" + str(user_id) + "/channels",
@@ -88,10 +88,10 @@ def do_user_channels(user_id=33234):
         for channel in r['channels']:
 
             # test mode
-            if True:
+            if False:
                 to_test=[142063, 419718, 422143, 422144]
                 if channel['id'] not in to_test:
-                    logging.warning("Channel {} {}: to skip in testing".format(str(channel['id']), str(channel['title'])))
+                    logging.warning(f"Channel {str(channel['id'])} {str(channel['title']).ljust(10)[0:10]}: skipping bcus testing")
                     continue
 
             # skip channel if not newly updated or added to
@@ -104,11 +104,11 @@ def do_user_channels(user_id=33234):
                 new_added_to_at = datetime.strptime(channel['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
 
                 if ((old_updated_at == new_updated_at) and (old_added_to_at == new_added_to_at)):
-                    logging.warning("Channel {} {}: nothing to update or add".format(str(channel['id']), str(channel['title'])))
+                    logging.warning(f"Channel {str(channel['id'])} {str(channel['title']).ljust(10)[0:10]}: nothing to update or add")
                     continue
 
             # merge channel
-            logging.warning("Channel {} {}: to merge ".format(str(channel['id']), str(channel['title'])))
+            logging.warning(f"Channel {str(channel['id'])} {str(channel['title']).ljust(10)[0:10]}: merging")
             props = channel
             if 'contents' in props:
                 del props['contents']
@@ -121,10 +121,24 @@ def do_user_channels(user_id=33234):
                 props=props
             ).stats()
 
-            # go thru channel's blocks
+            # go thru channel's blocks if they're not too old
             if (channel['length'] != 0):
-                logging.warning("Channel {} {}: to start going through all blocks".format(str(channel['id']), str(channel['title'])))
-                do_channel_blocks(channel['id'], channel['title'], channel['length'])
+                logging.warning(f"Channel {str(channel['id'])} {str(channel['title']).ljust(10)[0:10]}: starting going through all blocks")
+                if (channel['id'] in db_channel_ids):
+                    old_updated_at = [ o['updated_at'] for o in db_channels if o['id'] == channel['id'] ][0]
+                    old_updated_at = datetime.strptime(old_updated_at, '%Y-%m-%dT%H:%M:%S.%fZ')
+                    old_added_to_at = [ o['added_to_at'] for o in db_channels if o['id'] == channel['id'] ][0]
+                    old_added_to_at = datetime.strptime(old_added_to_at, '%Y-%m-%dT%H:%M:%S.%fZ')
+                    cutoff_date = min(old_updated_at, old_added_to_at)
+                else:
+                    cutoff_date = datetime(1,1,1)
+
+                do_channel_blocks(
+                    channel_id=channel['id'],
+                    channel_title=channel['title'],
+                    length=channel['length'],
+                    cutoff_date=cutoff_date
+                )
         
         current_page = r['current_page']
         total_pages = r['total_pages']
@@ -132,25 +146,26 @@ def do_user_channels(user_id=33234):
 
 
 
-def do_channel_blocks(channel_id=142063, channel_title="testmode", length=None):
+def do_channel_blocks(channel_id=142063, channel_title="testmode", length=None, cutoff_date=None):
     assert length is not None
+    assert cutoff_date is not None
     per = 100
     current_page = 0
     total_pages = math.ceil(length / per)
 
     # connections: reset all in this channel
-    logging.warning("Channel {} {}: to delete all block-channel rels".format(str(channel_id), str(channel_title)))
+    logging.warning(f"Channel {str(channel_id)} {str(channel_title).ljust(10)[0:10]}: deleting all block-channel rels")
     res = g.run(
         """MATCH (:Block)-[r:CONNECTS_TO]->(c:Channel {id: {channel_id}})
         DELETE r
         RETURN count(r) as cnt""",
         channel_id=channel_id,
     ).data()
-    logging.warning("Done: deleted {} rels".format(str(res[0]['cnt'])))
+    logging.warning(f"Channel {str(channel_id)} {str(channel_title).ljust(10)[0:10]}: done deleted {str(res[0]['cnt'])} rels")
 
     while (current_page < total_pages):
         # fetch API channel contents
-        logging.warning("Channel {} {}: to fetch API: page {}/{} ({})".format(str(channel_id), str(channel_title), str(current_page + 1), str(total_pages), str(length)))
+        logging.warning(f"Channel {str(channel_id)} {str(channel_title).ljust(10)[0:10]}: fetching API: page {str(current_page + 1)}/{str(total_pages)} ({str(length)})")
         response = requests.request(
             "GET",
             "http://api.are.na/v2/channels/" + str(channel_id) + "/contents",
@@ -162,22 +177,30 @@ def do_channel_blocks(channel_id=142063, channel_title="testmode", length=None):
 
         for block in r['contents']:
 
-            # merge block
-            logging.warning("Channel {} {}: Block {} {}: to merge".format(str(channel_id), str(channel_title), str(block['class']), str(block['id'])))
-            props = block
-            if 'contents' in props:
-                del props['contents']
-            props = flatten(props)
-            res = g.run(
-                """MERGE (b:Block {id: {id}})
-                SET b += {props}
-                """,
-                id=block['id'],
-                props=props
-            ).stats()
+            block_updated_at = datetime.strptime(block['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            block_created_at = datetime.strptime(block['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            block_cutoff_date = max(block_updated_at, block_created_at)
+
+            if (block_cutoff_date < cutoff_date):
+                # do nothing if block is too old and has been passed through
+                logging.warning(f"Channel {str(channel_id)} {str(channel_title).ljust(10)[0:10]}: Block {str(block['class']).ljust(6)[0:6]} {str(block['id'])}: old block nothing to do")
+            else:
+                # merge block
+                logging.warning(f"Channel {str(channel_id)} {str(channel_title).ljust(10)[0:10]}: Block {str(block['class']).ljust(6)[0:6]} {str(block['id'])}: merging")
+                props = block
+                if 'contents' in props:
+                    del props['contents']
+                props = flatten(props)
+                res = g.run(
+                    """MERGE (b:Block {id: {id}})
+                    SET b += {props}
+                    """,
+                    id=block['id'],
+                    props=props
+                ).stats()
 
             # create connection
-            logging.warning("Channel {} {}: Block {} {}: to create block-channel rel {})".format(str(channel_id), str(channel_title), str(block['class']), str(block['id']), str(block['connection_id'])))
+            logging.warning(f"Channel {str(channel_id)} {str(channel_title).ljust(10)[0:10]}: Block {str(block['class']).ljust(6)[0:6]} {str(block['id'])}: creating block-channel con id {str(block['connection_id'])})")
             props = {
                 'id': block['connection_id'],
                 'connected_at': block['connected_at'],
@@ -190,7 +213,7 @@ def do_channel_blocks(channel_id=142063, channel_title="testmode", length=None):
                 block_id=block['id'],
                 channel_id=channel_id,
             ).data()
-            logging.warning("Done: rel id {}".format(str(res[0]['id'])))
+            logging.warning(f"Channel {str(channel_id)} {str(channel_title).ljust(10)[0:10]}: Block {str(block['class']).ljust(6)[0:6]} {str(block['id'])}: done rel id {str(res[0]['id'])}")
 
         current_page += 1
 
