@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 import json
 import math
 from py2neo import Graph
@@ -47,27 +47,14 @@ g = Graph("bolt://neo4j:7687", auth=('neo4j', 'pass'))
 
 # routes
 # ======
-@app.route('/a')
-def route_a():
-    open('./app.log', 'w').close()
-    g.run("MATCH (n) DETACH DELETE n")
-    u = User(user_id=33234)
-    u.backup_channels(test_mode=True)
-    return "ok"
-
-@app.route('/b')
-def route_b():
-    u = User(user_id=33234)
-    u.backup_channels(test_mode=True)
-    return "ok"
-
-@app.route('/c')
+@app.route('/c', methods=['GET'])
 def route_c():
-    b = Backup()
-    b.reset_logfile()
-    b.reset_db()
-    b.go_for_it()
-    return "ok"
+    if request.method == 'GET':
+        b = Backup()
+        b.reset_logfile()
+        b.reset_db()
+        res = b.go_for_it()
+        return jsonify(res)
 
 
 
@@ -108,8 +95,8 @@ class User:
             res = self.fetch_one_from_api(user_id)
             user = res
         self._user = user
-        self.id = user['id']
-        self.slug = user['slug']
+        self.id = user['id'] if 'id' in user else None
+        self.slug = user['slug'] if 'slug' in user else None
         self._channels_from_db = []
         self._channels_from_api = []
         self._channel_relationships_to_create = []
@@ -139,20 +126,6 @@ class User:
         )
         r = response.json()
         return r
-
-
-    def __old_updated_at(self, channel_id):
-        res = [ o['updated_at'] for o in self._channels_from_db if o['id'] == channel_id ][0]
-        return datetime.strptime(res, '%Y-%m-%dT%H:%M:%S.%fZ')
-
-
-    def __old_added_to_at(self, channel_id):
-        res = [ o['added_to_at'] for o in self._channels_from_db if o['id'] == channel_id ][0]
-        return datetime.strptime(res, '%Y-%m-%dT%H:%M:%S.%fZ')
-
-
-    def __cutoff_date(self, channel_id):
-        return min(self.__old_updated_at(channel_id), self.__old_added_to_at(channel_id))
 
 
     def log(self, message):
@@ -197,13 +170,13 @@ class User:
     def backup_channels(self, test_mode=False):
         self.log("starting backup of channels, test_mode " + ("On" if test_mode else "Off"))
 
-        self._channels_from_db = Channel.fetch_all_from_db()
-        self._channels_from_api = Channel.fetch_all_from_api(user_id=self.id)
+        channels_from_api = Channel.fetch_all_from_api(user_id=self.id)
 
         self.__delete_user_channel_relationships()
         self._channel_relationships_to_create = []
+        _, all_ids_from_db, all_dates_from_db = Channel.all_datetimes_from_db(return_raw=False, return_ids=True, return_dates=True)
 
-        for channel in self._channels_from_api:
+        for channel in channels_from_api:
             c = Channel(channel)
             self._channel_relationships_to_create.append(c.id)
 
@@ -215,9 +188,9 @@ class User:
                     continue
 
             # skip channel if not newly updated or added to
-            if (c.id in self.channel_ids_from_db):
-                old_updated_at = self.__old_updated_at(c.id)
-                old_added_to_at = self.__old_added_to_at(c.id)
+            if (c.id in all_ids_from_db):
+                old_updated_at = all_dates_from_db[c.id]['updated_at']
+                old_added_to_at = all_dates_from_db[c.id]['addded_to_at']
                 new_updated_at = c.updated_at
                 new_added_to_at = c.added_to_at
 
@@ -230,8 +203,8 @@ class User:
 
             # go thru channel's blocks if they're not too old
             if (c.length != 0):
-                if (c.id in self.channel_ids_from_db):
-                    cutoff_date = self.__cutoff_date(c.id)
+                if (c.id in all_ids_from_db):
+                    cutoff_date = min(all_dates_from_db[c.id]['updated_at'], all_dates_from_db[c.id]['addded_to_at'])
                 else:
                     cutoff_date = datetime(1,1,1)
 
@@ -247,11 +220,11 @@ class User:
 class Channel:
     def __init__(self, channel):
         self._channel = channel
-        self.id = channel['id']
-        self.title = channel['title']
-        self.length = channel['length']
-        self.updated_at = datetime.strptime(channel['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
-        self.added_to_at = datetime.strptime(channel['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+        self.id = channel['id'] if 'id' in channel else None
+        self.title = channel['title'] if 'title' in channel else None
+        self.length = channel['length'] if 'length' in channel else None
+        self.updated_at = datetime.strptime(channel['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ') if 'updated_at' in channel else None
+        self.added_to_at = datetime.strptime(channel['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ') if 'added_to_at' in channel else None
         self._blocks_from_db = []
         self._blocks_from_api = []
         self._block_relationships_to_create = []
@@ -271,14 +244,27 @@ class Channel:
 
 
     @staticmethod
-    def fetch_all_from_db():
+    def fetch_all_from_db(return_raw=True, return_ids=False, return_dates=False):
         logging.warning(f"Fetching DB: all channels")
-        res = g.run(
+
+        res_raw = g.run(
             """MATCH (c:Channel)
             RETURN c.id as id, c.updated_at as updated_at, c.added_to_at as added_to_at
             """
         ).data()
-        return res
+
+        res_ids = [ o['id'] for o in res_raw ] if return_ids else None
+
+        res_dates = { 
+            o['id']: {
+                'updated_at': datetime.strptime(o['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                'added_to_at': datetime.strptime(o['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            }
+            for o in res
+        }
+        res_dates = res_dates if return_dates else None
+
+        return res_raw, res_ids, res_dates
 
 
     @staticmethod
@@ -371,23 +357,47 @@ class Channel:
 
 
 class Block:
-    def __init__(self, block):
+    def __init__(self, block=None, block_id=None):
+        if block is None:
+            assert block_id is not None
+            res = self.fetch_one_from_api(block_id)
+            block = res
         self._block = block
-        self.id = block['id']
-        self.class_ = block['class']
-        self.created_at = datetime.strptime(block['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
-        self.updated_at = datetime.strptime(block['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+        self.id = block['id'] if 'id' in block else None
+        self.class_ = block['class'] if 'class' in block else None
+        self.created_at = datetime.strptime(block['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ') if 'created_at' in block else None
+        self.updated_at = datetime.strptime(block['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ') if 'updated_at' in block else None
+        self._other_backup_props = {}
+    
+    def dotest(self):
+        self._other_backup_props['aaaaaasthsth'] = "mydoodee"
+        self._other_backup_props['aaaaaaqweqwe'] = 123123
     
     @property
     def backup_props(self):
         props = self._block
         if 'contents' in props:
             del props['contents']
-        return flatten(props)
+        if 'connections' in props:
+            del props['connections']
+        return {**flatten(props), **self._other_backup_props}
 
     @property
     def cutoff_date(self):
         return max(self.created_at, self.updated_at)
+
+
+    @staticmethod
+    def fetch_one_from_api(block_id):
+        logging.warning(f"Fetching API: block id {str(block_id)}")
+        response = requests.request(
+            "GET",
+            "https://api.are.na/v2/blocks/" + str(block_id),
+            timeout=60,
+            headers={"Authorization": "Bearer " + API_TOKEN},
+        )
+        r = response.json()
+        return r
 
 
     @staticmethod
