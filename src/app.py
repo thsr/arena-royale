@@ -38,18 +38,38 @@ g = Graph("bolt://neo4j:7687", auth=('neo4j', 'pass'))
 
 # routes
 # ======
-@app.route('/classdel')
-def route_classdel():
+@app.route('/a')
+def route_a():
     open('./app.log', 'w').close()
     g.run("MATCH (n) DETACH DELETE n")
-    u = User()
+    u = User(user_id=33234)
     u.backup_channels(test_mode=True)
     return "ok"
 
-@app.route('/classa')
-def route_classa():
-    u = User()
+@app.route('/b')
+def route_b():
+    u = User(user_id=33234)
     u.backup_channels(test_mode=True)
+    return "ok"
+
+@app.route('/c')
+def route_c():
+    b = Backup()
+    # b.reset_logfile()
+    b.reset_db()
+    b.go_for_it()
+    return "ok"
+
+@app.route('/d')
+def route_d():
+    open('./app.log', 'w').close()
+
+    g.run("MATCH (n) DETACH DELETE n")
+
+    u = User(user_id=33234)
+    u.fetch_user_from_api()
+    u.merge_in_db()
+
     return "ok"
 
 
@@ -57,16 +77,68 @@ def route_classa():
 
 # modules
 # =======
+class Backup:
+    def __init__(self):
+        pass
+
+    def reset_logfile(self):
+        open('./app.log', 'w').close()
+
+    def reset_db(self):
+        g.run("MATCH (n) DETACH DELETE n")
+
+    def redo_user(self):
+        u = User(user_id=33234)
+        u.merge_in_db()
+
+    def go_for_it(self):
+        logging.warning("starting backup, starting at user node, user_id " + str(33234))
+        u = User(user_id=33234)
+        u.backup_channels()
+        return "ok"
+
+
+
+
 class User:
-    def __init__(self, user_id=33234):
-        self.id = user_id
+    def __init__(self, user=None, user_id=33234):
+        if user is None:
+            assert user_id is not None
+            res = self.fetch_one_from_api(user_id)
+            self._user = res
+            self.id = res['id']
+        else:
+            self._user = user
+            self.id = user['id']
         self._channels_from_db = []
         self._channels_from_api = []
+        self._channel_relationships_to_create = []
 
 
     @property
     def channel_ids_from_db(self):
         return [ o['id'] for o in self._channels_from_db ]
+
+
+    @property
+    def backup_props(self):
+        props = self._user
+        if 'contents' in props:
+            del props['contents']
+        return flatten(props)
+
+
+    @staticmethod
+    def fetch_one_from_api(user_id):
+        logging.warning(f"Fetching API: user id {str(user_id)}")
+        response = requests.request(
+            "GET",
+            "https://api.are.na/v2/users/" + str(user_id),
+            timeout=60,
+            headers={"Authorization": "Bearer c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"},
+        )
+        r = response.json()
+        return r
 
 
     def __old_updated_at(self, channel_id):
@@ -84,51 +156,56 @@ class User:
 
 
     def log(self, message):
-        logging.warning(f"User {str(self.id)}: " + message)
+        logging.warning(f"User {str(self.id)}: {message}")
 
 
-    def __fetch_channels_from_db(self):
-        self._channels_from_db = []
-        self.log(f"fetching all channels in db")
+    def merge_in_db(self):
+        self.log("merging user in db")
+        g.run(
+            """MERGE (c:User {id: {id}})
+            SET c += {props}
+            """,
+            id=self.id,
+            props=self.backup_props
+        )
+
+
+    def __create_user_channel_relationships(self):
+        self.log("creating all block-channel rels")
         res = g.run(
-            """MATCH (c:Channel)
-            RETURN c.id as id, c.updated_at as updated_at, c.added_to_at as added_to_at
-            """
+            """MATCH (u:User {id: {user_id}}), (c:Channel)
+            WHERE c.id in {list}
+            MERGE (b)-[r:OWNS]->(c)
+            RETURN count(r) as cnt""",
+            user_id=self.id,
+            list=self._channel_relationships_to_create,
         ).data()
-        self._channels_from_db = res
+        self.log(f"done created {str(res[0]['cnt'])} rels")
 
 
-    def __fetch_channels_from_api(self):
-        self._channels_from_api = []
-        per = 100
-        current_page = 0
-        total_pages = 1
-
-        while (current_page < total_pages):
-            # fetch API for user
-            self.log(f"fetching all channels API: page {str(current_page + 1)}/{str(total_pages)}")
-            response = requests.request(
-                "GET",
-                "https://api.are.na/v2/users/" + str(self.id) + "/channels",
-                timeout=60,
-                headers={"Authorization": "Bearer c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"},
-                params={"per": per, "page": current_page + 1},
-            )
-            r = response.json()
-            
-            self._channels_from_api += r['channels']
-        
-            current_page = r['current_page']
-            total_pages = r['total_pages']
+    def __delete_user_channel_relationships(self):
+        self.log("deleting all block-channel rels")
+        res = g.run(
+            """MATCH (:User {id: {user_id}})-[r:OWNS]->(:Channel)
+            DELETE r
+            RETURN count(r) as cnt""",
+            user_id=self.id,
+        ).data()
+        self.log(f"done deleted {str(res[0]['cnt'])} rels")
 
 
     def backup_channels(self, test_mode=False):
         self.log("starting backup of channels, test_mode " + ("On" if test_mode else "Off"))
-        self.__fetch_channels_from_db()
-        self.__fetch_channels_from_api()
+
+        self._channels_from_db = Channel.fetch_all_from_db()
+        self._channels_from_api = Channel.fetch_all_from_api(user_id=self.id)
+
+        self.__delete_user_channel_relationships()
+        self._channel_relationships_to_create = []
 
         for channel in self._channels_from_api:
             c = Channel(channel)
+            self._channel_relationships_to_create.append(c.id)
 
             # test mode
             if test_mode:
@@ -139,8 +216,8 @@ class User:
 
             # skip channel if not newly updated or added to
             if (c.id in self.channel_ids_from_db):
-                old_updated_at = self.__old_updated_at(channel['id'])
-                old_added_to_at = self.__old_added_to_at(channel['id'])
+                old_updated_at = self.__old_updated_at(c.id)
+                old_added_to_at = self.__old_added_to_at(c.id)
                 new_updated_at = c.updated_at
                 new_added_to_at = c.added_to_at
 
@@ -149,7 +226,7 @@ class User:
                     continue
 
             # merge channel
-            c.backup_merge()
+            c.merge_in_db()
 
             # go thru channel's blocks if they're not too old
             if (c.length != 0):
@@ -159,6 +236,8 @@ class User:
                     cutoff_date = datetime(1,1,1)
 
                 c.backup_blocks(cutoff_date=cutoff_date)
+
+        self.__create_user_channel_relationships()
 
         return "ok"
 
@@ -191,11 +270,48 @@ class Channel:
         return flatten(props)
 
 
+    @staticmethod
+    def fetch_all_from_db():
+        logging.warning(f"Fetching DB: all channels")
+        res = g.run(
+            """MATCH (c:Channel)
+            RETURN c.id as id, c.updated_at as updated_at, c.added_to_at as added_to_at
+            """
+        ).data()
+        return res
+
+
+    @staticmethod
+    def fetch_all_from_api(user_id):
+        res = []
+        per = 100
+        current_page = 0
+        total_pages = 1
+
+        while (current_page < total_pages):
+            logging.warning(f"Fetching API: all channels for user {user_id}: page {str(current_page + 1)}/{str(total_pages)}")
+            response = requests.request(
+                "GET",
+                "https://api.are.na/v2/users/" + str(user_id) + "/channels",
+                timeout=60,
+                headers={"Authorization": "Bearer c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"},
+                params={"per": per, "page": current_page + 1},
+            )
+            r = response.json()
+            
+            res += r['channels']
+        
+            current_page = r['current_page']
+            total_pages = r['total_pages']
+
+        return res
+
+
     def log(self, message):
-        logging.warning(f"Channel {str(self.id)} {str(self.title).ljust(10)[0:10]}: " + message)
+        logging.warning(f"Channel {str(self.id)} {str(self.title).ljust(10)[0:10]}: {message}")
 
 
-    def backup_merge(self):
+    def merge_in_db(self):
         self.log("merging")
         g.run(
             """MERGE (c:Channel {id: {id}})
@@ -206,7 +322,7 @@ class Channel:
         )
 
 
-    def __create_block_relationships_to_channel(self):
+    def __create_block_channel_relationships(self):
         self.log("creating all block-channel rels")
         res = g.run(
             """MATCH (b:Block), (c:Channel {id: {channel_id}})
@@ -219,7 +335,7 @@ class Channel:
         self.log(f"done created {str(res[0]['cnt'])} rels")
 
 
-    def __delete_block_relationships_to_channel(self):
+    def __delete_block_channel_relationships(self):
         self.log("deleting all block-channel rels")
         res = g.run(
             """MATCH (:Block)-[r:CONNECTS_TO]->(c:Channel {id: {channel_id}})
@@ -230,48 +346,24 @@ class Channel:
         self.log(f"done deleted {str(res[0]['cnt'])} rels")
 
 
-    def __fetch_blocks_from_api(self):
-        self._blocks_from_api = []
-        per = 100
-        current_page = 0
-        total_pages = math.ceil(self.length / per)
-
-        while (current_page < total_pages):
-            self.log(f"fetching API: page {str(current_page + 1)}/{str(total_pages)} ({str(self.length)})")
-        
-            response = requests.request(
-                "GET",
-                "http://api.are.na/v2/channels/" + str(self.id),# + "/contents",
-                timeout=60,
-                headers={"Authorization": "Bearer c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"},
-                params={"per": per, "page": current_page + 1},
-            )
-            r = response.json()
-
-            self._blocks_from_api += r['contents']
-
-            current_page += 1
-
-        assert len(self._blocks_from_api) == r['length']
-
-
     def backup_blocks(self, cutoff_date=None):
         self.log("starting backup of blocks")
-        self.__fetch_blocks_from_api()
-        self.__delete_block_relationships_to_channel()
+        
+        self._blocks_from_api = Block.fetch_all_from_api(channel_id=self.id)
+
+        self.__delete_block_channel_relationships()
         self._block_relationships_to_create = []
 
         for block in self._blocks_from_api:
             b = Block(block)
+            self._block_relationships_to_create.append(b.id)
 
             if (b.cutoff_date < cutoff_date):
                 b.log("old block nothing to do")
             else:
-                b.backup_merge()
+                b.merge_in_db()
 
-            self._block_relationships_to_create.append(b.id)
-
-        self.__create_block_relationships_to_channel()
+        self.__create_block_channel_relationships()
 
         return "ok"
 
@@ -292,17 +384,47 @@ class Block:
         if 'contents' in props:
             del props['contents']
         return flatten(props)
-    
+
     @property
     def cutoff_date(self):
         return max(self.created_at, self.updated_at)
 
 
+    @staticmethod
+    def fetch_all_from_api(channel_id):
+        res = []
+        per = 100
+        current_page = 0
+        total_pages = 1
+
+        while (current_page < total_pages):
+            logging.warning(f"Fetching API: all blocks for channel {channel_id}: page {str(current_page + 1)}/{str(total_pages)}")
+        
+            response = requests.request(
+                "GET",
+                "http://api.are.na/v2/channels/" + str(channel_id),
+                timeout=60,
+                headers={"Authorization": "Bearer c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"},
+                params={"per": per, "page": current_page + 1},
+            )
+            r = response.json()
+
+            res += r['contents']
+
+            current_page += 1
+            total_pages = math.ceil(r['length'] / per)
+
+        assert len(res) == r['length']
+        logging.warning(f"Done fetching API: {str(len(res))} blocks")
+
+        return res
+
+
     def log(self, message):
-        logging.warning(f"Block {str(self.class_).ljust(5)[0:5]} {str(self.id)}: " + message)
+        logging.warning(f"Block {str(self.class_).ljust(5)[0:5]} {str(self.id)}: {message}")
 
 
-    def backup_merge(self):
+    def merge_in_db(self):
         self.log("merging")
         g.run(
             """MERGE (b:Block {id: {id}})
