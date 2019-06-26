@@ -8,6 +8,15 @@ import requests
 
 
 
+# const
+# =====
+# CHANNELS_TO_TEST = [142063, 419718, 422143, 422144, 411952    159627]
+API_TOKEN = "c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"
+CHANNELS_TO_TEST = [142063, 419718, 422143, 422144, 411952]
+
+
+
+
 # utils
 # =====
 import logging
@@ -55,21 +64,9 @@ def route_b():
 @app.route('/c')
 def route_c():
     b = Backup()
-    # b.reset_logfile()
+    b.reset_logfile()
     b.reset_db()
     b.go_for_it()
-    return "ok"
-
-@app.route('/d')
-def route_d():
-    open('./app.log', 'w').close()
-
-    g.run("MATCH (n) DETACH DELETE n")
-
-    u = User(user_id=33234)
-    u.fetch_user_from_api()
-    u.merge_in_db()
-
     return "ok"
 
 
@@ -93,8 +90,12 @@ class Backup:
 
     def go_for_it(self):
         logging.warning("starting backup, starting at user node, user_id " + str(33234))
+
         u = User(user_id=33234)
-        u.backup_channels()
+
+        u.merge_in_db()
+
+        u.backup_channels(test_mode=True)
         return "ok"
 
 
@@ -105,11 +106,10 @@ class User:
         if user is None:
             assert user_id is not None
             res = self.fetch_one_from_api(user_id)
-            self._user = res
-            self.id = res['id']
-        else:
-            self._user = user
-            self.id = user['id']
+            user = res
+        self._user = user
+        self.id = user['id']
+        self.slug = user['slug']
         self._channels_from_db = []
         self._channels_from_api = []
         self._channel_relationships_to_create = []
@@ -135,7 +135,7 @@ class User:
             "GET",
             "https://api.are.na/v2/users/" + str(user_id),
             timeout=60,
-            headers={"Authorization": "Bearer c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"},
+            headers={"Authorization": "Bearer " + API_TOKEN},
         )
         r = response.json()
         return r
@@ -156,7 +156,7 @@ class User:
 
 
     def log(self, message):
-        logging.warning(f"User {str(self.id)}: {message}")
+        logging.warning(f"User {str(self.id)} {str(self.slug).ljust(10)[0:10]}: {message}")
 
 
     def merge_in_db(self):
@@ -171,11 +171,11 @@ class User:
 
 
     def __create_user_channel_relationships(self):
-        self.log("creating all block-channel rels")
+        self.log("creating all user-channel rels")
         res = g.run(
             """MATCH (u:User {id: {user_id}}), (c:Channel)
             WHERE c.id in {list}
-            MERGE (b)-[r:OWNS]->(c)
+            MERGE (u)-[r:OWNS]->(c)
             RETURN count(r) as cnt""",
             user_id=self.id,
             list=self._channel_relationships_to_create,
@@ -184,7 +184,7 @@ class User:
 
 
     def __delete_user_channel_relationships(self):
-        self.log("deleting all block-channel rels")
+        self.log("deleting all user-channel rels")
         res = g.run(
             """MATCH (:User {id: {user_id}})-[r:OWNS]->(:Channel)
             DELETE r
@@ -209,7 +209,7 @@ class User:
 
             # test mode
             if test_mode:
-                to_test=[142063, 419718, 422143, 422144,      159627]
+                to_test=CHANNELS_TO_TEST
                 if c.id not in to_test:
                     c.log("skipping bcus testing")
                     continue
@@ -294,7 +294,7 @@ class Channel:
                 "GET",
                 "https://api.are.na/v2/users/" + str(user_id) + "/channels",
                 timeout=60,
-                headers={"Authorization": "Bearer c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"},
+                headers={"Authorization": "Bearer " + API_TOKEN},
                 params={"per": per, "page": current_page + 1},
             )
             r = response.json()
@@ -404,7 +404,7 @@ class Block:
                 "GET",
                 "http://api.are.na/v2/channels/" + str(channel_id),
                 timeout=60,
-                headers={"Authorization": "Bearer c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"},
+                headers={"Authorization": "Bearer " + API_TOKEN},
                 params={"per": per, "page": current_page + 1},
             )
             r = response.json()
