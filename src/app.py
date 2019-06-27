@@ -10,10 +10,14 @@ import requests
 
 # const
 # =====
-# CHANNELS_TO_TEST = [142063, 419718, 422143, 422144, 411952    159627]
 API_TOKEN = "c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"
+# CHANNELS_TO_TEST = [142063, 419718, 422143, 422144, 411952    159627]
+DEFAULT_USER_ID=33234
 CHANNELS_TO_TEST = [142063, 419718, 422143, 422144, 411952]
 
+GCS_PROJECT="thsr-project"
+GCS_BUCKET="thsr-bucket"
+GCS_CRED_FILE="./here.json"
 
 
 
@@ -33,6 +37,9 @@ def flatten(d, parent_key='', sep='_'):
             items.append((new_key, v))
     return dict(items)
 
+def generate_epoch_filename(ext="jpg"):
+    return str(int(datetime.now().timestamp()*1000)) + "." + ext
+
 
 
 
@@ -51,10 +58,47 @@ g = Graph("bolt://neo4j:7687", auth=('neo4j', 'pass'))
 def route_c():
     if request.method == 'GET':
         b = Backup()
-        b.reset_logfile()
-        b.reset_db()
+        b.clear_logfile()
+        b.clear_db()
         res = b.go_for_it()
         return jsonify(res)
+
+@app.route('/d', methods=['GET'])
+def route_d():
+    if request.method == 'GET':
+        b = Backup()
+        res = b.go_for_it()
+        return jsonify(res)
+
+@app.route('/e', methods=['GET'])
+def route_e():
+    if request.method == 'GET':
+        blob_name = "arenaroyale/"+generate_epoch_filename()
+        url = "https://d2w9rnfcy7mm78.cloudfront.net/1490395/large_3c3ffa01970075a2ddfb63877254ef4a.jpg?1512657398"
+        res = gc_stuff.upload_to_gcs(blob_name, url)
+        return jsonify(res)
+
+
+
+
+# google cloud stuff
+# ==================
+from google.cloud import storage
+
+class GCStuff:
+    def __init__(self):
+        self.cred_file = GCS_CRED_FILE
+        self.storage_client = storage.Client.from_service_account_json(self.cred_file)
+        self.bucket = self.storage_client.get_bucket(GCS_BUCKET)
+
+    def upload_to_gcs(self, blob_name, url):
+        blob = self.bucket.blob(blob_name)
+        f = requests.get(url).content
+        blob.upload_from_string(data=f, content_type="image/jpg")
+        blob.make_public()
+        return str(blob.public_url)
+
+gc_stuff = GCStuff()
 
 
 
@@ -65,20 +109,20 @@ class Backup:
     def __init__(self):
         pass
 
-    def reset_logfile(self):
+    def clear_logfile(self):
         open('./app.log', 'w').close()
 
-    def reset_db(self):
+    def clear_db(self):
         g.run("MATCH (n) DETACH DELETE n")
 
     def redo_user(self):
-        u = User(user_id=33234)
+        u = User(user_id=DEFAULT_USER_ID)
         u.merge_in_db()
 
     def go_for_it(self):
-        logging.warning("starting backup, starting at user node, user_id " + str(33234))
+        logging.warning("starting backup, starting at user node, user_id " + str(DEFAULT_USER_ID))
 
-        u = User(user_id=33234)
+        u = User(user_id=DEFAULT_USER_ID)
 
         u.merge_in_db()
 
@@ -89,7 +133,7 @@ class Backup:
 
 
 class User:
-    def __init__(self, user=None, user_id=33234):
+    def __init__(self, user=None, user_id=DEFAULT_USER_ID):
         if user is None:
             assert user_id is not None
             res = self.fetch_one_from_api(user_id)
@@ -174,7 +218,7 @@ class User:
 
         self.__delete_user_channel_relationships()
         self._channel_relationships_to_create = []
-        _, all_ids_from_db, all_dates_from_db = Channel.all_datetimes_from_db(return_raw=False, return_ids=True, return_dates=True)
+        _, all_ids_from_db, all_dates_from_db = Channel.fetch_all_from_db(return_raw=False, return_ids=True, return_dates=True)
 
         for channel in channels_from_api:
             c = Channel(channel)
@@ -190,7 +234,7 @@ class User:
             # skip channel if not newly updated or added to
             if (c.id in all_ids_from_db):
                 old_updated_at = all_dates_from_db[c.id]['updated_at']
-                old_added_to_at = all_dates_from_db[c.id]['addded_to_at']
+                old_added_to_at = all_dates_from_db[c.id]['added_to_at']
                 new_updated_at = c.updated_at
                 new_added_to_at = c.added_to_at
 
@@ -204,7 +248,7 @@ class User:
             # go thru channel's blocks if they're not too old
             if (c.length != 0):
                 if (c.id in all_ids_from_db):
-                    cutoff_date = min(all_dates_from_db[c.id]['updated_at'], all_dates_from_db[c.id]['addded_to_at'])
+                    cutoff_date = min(all_dates_from_db[c.id]['updated_at'], all_dates_from_db[c.id]['added_to_at'])
                 else:
                     cutoff_date = datetime(1,1,1)
 
@@ -257,11 +301,9 @@ class Channel:
 
         res_dates = { 
             o['id']: {
-                'updated_at': datetime.strptime(o['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
-                'added_to_at': datetime.strptime(o['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            }
-            for o in res
-        }
+                'updated_at': datetime.strptime(o['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                'added_to_at': datetime.strptime(o['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+            } for o in res_raw }
         res_dates = res_dates if return_dates else None
 
         return res_raw, res_ids, res_dates

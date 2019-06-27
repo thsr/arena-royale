@@ -1,4 +1,5 @@
 flask>=0.12.3
 Flask-RESTful
+google-cloud-storage
 py2neo
 requests
