@@ -73,9 +73,18 @@ def route_d():
 @app.route('/e', methods=['GET'])
 def route_e():
     if request.method == 'GET':
-        blob_name = "arenaroyale/"+generate_epoch_filename()
-        url = "https://d2w9rnfcy7mm78.cloudfront.net/1490395/large_3c3ffa01970075a2ddfb63877254ef4a.jpg?1512657398"
+        blob_name = "arenaroyale/1561442550136.webm"#+generate_epoch_filename()
+        url = "http://is2.4chan.org/gif/1561442550136.webm"
         res = gc_stuff.upload_to_gcs(blob_name, url)
+        return jsonify(res)
+
+@app.route('/f', methods=['GET'])
+def route_f():
+    if request.method == 'GET':
+        b = Backup()
+        b.clear_logfile()
+        b.clear_db()
+        res = b.go_for_it(test_mode=False)
         return jsonify(res)
 
 
@@ -93,8 +102,8 @@ class GCStuff:
 
     def upload_to_gcs(self, blob_name, url):
         blob = self.bucket.blob(blob_name)
-        f = requests.get(url).content
-        blob.upload_from_string(data=f, content_type="image/jpg")
+        f = requests.get(url)
+        blob.upload_from_string(data=f.content, content_type=f.headers['Content-Type'])
         blob.make_public()
         return str(blob.public_url)
 
@@ -116,34 +125,36 @@ class Backup:
         g.run("MATCH (n) DETACH DELETE n")
 
     def redo_user(self):
-        u = User(user_id=DEFAULT_USER_ID)
+        u = User.from_api(user_id=DEFAULT_USER_ID)
         u.merge_in_db()
 
-    def go_for_it(self):
+    def go_for_it(self, test_mode=True):
         logging.warning("starting backup, starting at user node, user_id " + str(DEFAULT_USER_ID))
 
-        u = User(user_id=DEFAULT_USER_ID)
+        u = User.from_api(user_id=DEFAULT_USER_ID)
 
         u.merge_in_db()
 
-        u.backup_channels(test_mode=True)
+        u.backup_channels(test_mode=test_mode)
         return "ok"
 
 
 
 
 class User:
-    def __init__(self, user=None, user_id=DEFAULT_USER_ID):
-        if user is None:
-            assert user_id is not None
-            res = self.fetch_one_from_api(user_id)
-            user = res
+    def __init__(self, user):
         self._user = user
         self.id = user['id'] if 'id' in user else None
         self.slug = user['slug'] if 'slug' in user else None
         self._channels_from_db = []
         self._channels_from_api = []
         self._channel_relationships_to_create = []
+
+
+    @classmethod
+    def from_api(cls, user_id):
+        res = self.fetch_one_from_api(user_id)
+        return cls(res)
 
 
     @property
@@ -215,10 +226,10 @@ class User:
         self.log("starting backup of channels, test_mode " + ("On" if test_mode else "Off"))
 
         channels_from_api = Channel.fetch_all_from_api(user_id=self.id)
+        _, all_channel_ids_from_db, all_channel_dates_from_db = Channel.fetch_all_from_db(return_raw=False, return_ids=True, return_dates=True)
 
         self.__delete_user_channel_relationships()
         self._channel_relationships_to_create = []
-        _, all_ids_from_db, all_dates_from_db = Channel.fetch_all_from_db(return_raw=False, return_ids=True, return_dates=True)
 
         for channel in channels_from_api:
             c = Channel(channel)
@@ -232,9 +243,9 @@ class User:
                     continue
 
             # skip channel if not newly updated or added to
-            if (c.id in all_ids_from_db):
-                old_updated_at = all_dates_from_db[c.id]['updated_at']
-                old_added_to_at = all_dates_from_db[c.id]['added_to_at']
+            if (c.id in all_channel_ids_from_db):
+                old_updated_at = all_channel_dates_from_db[c.id]['updated_at']
+                old_added_to_at = all_channel_dates_from_db[c.id]['added_to_at']
                 new_updated_at = c.updated_at
                 new_added_to_at = c.added_to_at
 
@@ -247,8 +258,8 @@ class User:
 
             # go thru channel's blocks if they're not too old
             if (c.length != 0):
-                if (c.id in all_ids_from_db):
-                    cutoff_date = min(all_dates_from_db[c.id]['updated_at'], all_dates_from_db[c.id]['added_to_at'])
+                if (c.id in all_channel_ids_from_db):
+                    cutoff_date = min(all_channel_dates_from_db[c.id]['updated_at'], all_channel_dates_from_db[c.id]['added_to_at'])
                 else:
                     cutoff_date = datetime(1,1,1)
 
@@ -275,11 +286,6 @@ class Channel:
 
 
     @property
-    def block_ids_from_api(self):
-        return [ o['id'] for o in self._blocks_from_api ]
-
-
-    @property
     def backup_props(self):
         props = self._channel
         if 'contents' in props:
@@ -299,12 +305,17 @@ class Channel:
 
         res_ids = [ o['id'] for o in res_raw ] if return_ids else None
 
-        res_dates = { 
-            o['id']: {
-                'updated_at': datetime.strptime(o['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-                'added_to_at': datetime.strptime(o['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
-            } for o in res_raw }
-        res_dates = res_dates if return_dates else None
+        if return_dates:
+            res_dates = {
+                o['id']: {
+                    'updated_at': datetime.strptime(o['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'added_to_at': datetime.strptime(o['added_to_at'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                } for o in res_raw }
+        else:
+            res_dates = None
+
+        if not return_raw:
+            res_raw = None
 
         return res_raw, res_ids, res_dates
 
@@ -377,18 +388,17 @@ class Channel:
     def backup_blocks(self, cutoff_date=None):
         self.log("starting backup of blocks")
         
-        self._blocks_from_api = Block.fetch_all_from_api(channel_id=self.id)
+        blocks_from_api = Block.fetch_all_from_api(channel_id=self.id)
+        _, all_block_ids_from_db = Block.fetch_all_from_db(return_raw=False, return_ids=True)
 
         self.__delete_block_channel_relationships()
         self._block_relationships_to_create = []
 
-        for block in self._blocks_from_api:
+        for block in blocks_from_api:
             b = Block(block)
             self._block_relationships_to_create.append(b.id)
 
-            if (b.cutoff_date < cutoff_date):
-                b.log("old block nothing to do")
-            else:
+            if (b.id not in all_block_ids_from_db):
                 b.merge_in_db()
 
         self.__create_block_channel_relationships()
@@ -399,18 +409,21 @@ class Channel:
 
 
 class Block:
-    def __init__(self, block=None, block_id=None):
-        if block is None:
-            assert block_id is not None
-            res = self.fetch_one_from_api(block_id)
-            block = res
+    def __init__(self, block):
         self._block = block
         self.id = block['id'] if 'id' in block else None
         self.class_ = block['class'] if 'class' in block else None
         self.created_at = datetime.strptime(block['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ') if 'created_at' in block else None
         self.updated_at = datetime.strptime(block['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ') if 'updated_at' in block else None
         self._other_backup_props = {}
-    
+
+
+    @classmethod
+    def from_api(cls, block_id):
+        res = self.fetch_one_from_api(block_id)
+        return cls(res)
+
+
     def dotest(self):
         self._other_backup_props['aaaaaasthsth'] = "mydoodee"
         self._other_backup_props['aaaaaaqweqwe'] = 123123
@@ -427,6 +440,24 @@ class Block:
     @property
     def cutoff_date(self):
         return max(self.created_at, self.updated_at)
+
+
+    @staticmethod
+    def fetch_all_from_db(return_raw=True, return_ids=False):
+        logging.warning(f"Fetching DB: all blocks")
+
+        res_raw = g.run(
+            """MATCH (c:Block)
+            RETURN c.id as id
+            """
+        ).data()
+
+        res_ids = [ o['id'] for o in res_raw ] if return_ids else None
+
+        if not return_raw:
+            res_raw = None
+
+        return res_raw, res_ids
 
 
     @staticmethod
@@ -466,8 +497,9 @@ class Block:
             current_page += 1
             total_pages = math.ceil(r['length'] / per)
 
-        assert len(res) == r['length']
         logging.warning(f"Done fetching API: {str(len(res))} blocks")
+        if len(res) != r['length']:
+            logging.warning(f"Promised {str(r['length'])} blocks but gotten {str(len(res))}")
 
         return res
 
