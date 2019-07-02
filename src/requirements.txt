@@ -1,5 +1,5 @@
-flask>=0.12.3
-Flask-RESTful
-google-cloud-storage
-py2neo
-requests
+Flask==1.0.3
+Flask-RESTful==0.3.7
+google-cloud-storage==1.16.1
+py2neo==4.3.0
+requests==2.22.0

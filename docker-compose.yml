@@ -19,10 +19,10 @@ services:
 
   pythonflask:
     build: .
-    # expose:
-    #   - 5000
-    # ports:
-    #   - '5000:80'
+    expose:
+      - 80
+    ports:
+      - '5000:80'
     volumes:
       - ./src:/app
     depends_on:

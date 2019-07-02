@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 import json
 import math
 from py2neo import Graph
@@ -13,11 +13,18 @@ import requests
 API_TOKEN = "c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"
 # CHANNELS_TO_TEST = [142063, 419718, 422143, 422144, 411952    159627]
 DEFAULT_USER_ID=33234
-CHANNELS_TO_TEST = [142063, 419718, 422143, 422144, 411952]
+CHANNELS_TO_TEST = [
+    142063, #q1e
+    419718, #dev
+    422143, #flask
+    422144, #py
+    411952, #TEXT
+    # 159627, #DRAWING
+]
 
 GCS_PROJECT="thsr-project"
 GCS_BUCKET="thsr-bucket"
-GCS_CRED_FILE="./here.json"
+GCS_CRED_FILE="./gcskey.json"
 
 
 
@@ -26,12 +33,12 @@ GCS_CRED_FILE="./here.json"
 import logging
 logging.basicConfig(filename='./app.log',level=logging.WARNING,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 
-import collections
+from collections import MutableMapping
 def flatten(d, parent_key='', sep='_'):
     items = []
     for k, v in d.items():
         new_key = parent_key + sep + k if parent_key else k
-        if isinstance(v, collections.MutableMapping):
+        if isinstance(v, MutableMapping):
             items.extend(flatten(v, new_key, sep=sep).items())
         else:
             items.append((new_key, v))
@@ -39,6 +46,9 @@ def flatten(d, parent_key='', sep='_'):
 
 def generate_epoch_filename(ext="jpg"):
     return str(int(datetime.now().timestamp()*1000)) + "." + ext
+
+def ms_now():
+    return str(int(datetime.now().timestamp()*1000))
 
 
 
@@ -54,38 +64,51 @@ g = Graph("bolt://neo4j:7687", auth=('neo4j', 'pass'))
 
 # routes
 # ======
-@app.route('/c', methods=['GET'])
+@app.route('/c', methods=['POST'])
 def route_c():
-    if request.method == 'GET':
+    if request.method == 'POST':
         b = Backup()
         b.clear_logfile()
         b.clear_db()
         res = b.go_for_it()
         return jsonify(res)
 
-@app.route('/d', methods=['GET'])
+@app.route('/d', methods=['POST'])
 def route_d():
-    if request.method == 'GET':
+    if request.method == 'POST':
         b = Backup()
         res = b.go_for_it()
         return jsonify(res)
 
-@app.route('/e', methods=['GET'])
+@app.route('/e', methods=['POST'])
 def route_e():
-    if request.method == 'GET':
-        blob_name = "arenaroyale/1561442550136.webm"#+generate_epoch_filename()
-        url = "http://is2.4chan.org/gif/1561442550136.webm"
+    if request.method == 'POST':
+        blob_name = "dir/file.webm"
+        url = "http://example.com/file.webm"
         res = gc_stuff.upload_to_gcs(blob_name, url)
         return jsonify(res)
 
-@app.route('/f', methods=['GET'])
+@app.route('/f', methods=['POST'])
 def route_f():
-    if request.method == 'GET':
+    if request.method == 'POST':
         b = Backup()
         b.clear_logfile()
         b.clear_db()
         res = b.go_for_it(test_mode=False)
         return jsonify(res)
+
+@app.route('/h', methods=['POST'])
+def route_h():
+    if request.method == 'POST':
+        b = Backup()
+        res = b.go_for_it(test_mode=False)
+        return jsonify(res)
+
+@app.route('/g', methods=['POST'])
+def route_g():
+    if request.method == 'POST':
+        logging.warning("here is my result k")
+        return "ok"
 
 
 
@@ -95,10 +118,9 @@ def route_f():
 from google.cloud import storage
 
 class GCStuff:
-    def __init__(self):
-        self.cred_file = GCS_CRED_FILE
-        self.storage_client = storage.Client.from_service_account_json(self.cred_file)
-        self.bucket = self.storage_client.get_bucket(GCS_BUCKET)
+    def __init__(self, cred_file, bucket):
+        self.storage_client = storage.Client.from_service_account_json(cred_file)
+        self.bucket = self.storage_client.get_bucket(bucket)
 
     def upload_to_gcs(self, blob_name, url):
         blob = self.bucket.blob(blob_name)
@@ -107,13 +129,13 @@ class GCStuff:
         blob.make_public()
         return str(blob.public_url)
 
-gc_stuff = GCStuff()
+gc_stuff = GCStuff(GCS_CRED_FILE, GCS_BUCKET)
 
 
 
 
-# modules
-# =======
+# models
+# ======
 class Backup:
     def __init__(self):
         pass
@@ -153,7 +175,7 @@ class User:
 
     @classmethod
     def from_api(cls, user_id):
-        res = self.fetch_one_from_api(user_id)
+        res = cls.fetch_one_from_api(user_id)
         return cls(res)
 
 
@@ -181,6 +203,31 @@ class User:
         )
         r = response.json()
         return r
+
+
+    def channels_from_api(self):
+        res = []
+        per = 100
+        current_page = 0
+        total_pages = 1
+
+        while (current_page < total_pages):
+            self.log(f"Fetching API: all channels for this user: page {str(current_page + 1)}/{str(total_pages)}")
+            response = requests.request(
+                "GET",
+                "https://api.are.na/v2/users/" + str(self.id) + "/channels",
+                timeout=60,
+                headers={"Authorization": "Bearer " + API_TOKEN},
+                params={"per": per, "page": current_page + 1},
+            )
+            r = response.json()
+            
+            res += r['channels']
+        
+            current_page = r['current_page']
+            total_pages = r['total_pages']
+
+        return res
 
 
     def log(self, message):
@@ -223,9 +270,9 @@ class User:
 
 
     def backup_channels(self, test_mode=False):
-        self.log("starting backup of channels, test_mode " + ("On" if test_mode else "Off"))
+        self.log("starting backup of channels, test_mode " + ("ON" if test_mode else "OFF"))
 
-        channels_from_api = Channel.fetch_all_from_api(user_id=self.id)
+        channels_from_api = self.channels_from_api()
         _, all_channel_ids_from_db, all_channel_dates_from_db = Channel.fetch_all_from_db(return_raw=False, return_ids=True, return_dates=True)
 
         self.__delete_user_channel_relationships()
@@ -295,7 +342,7 @@ class Channel:
 
     @staticmethod
     def fetch_all_from_db(return_raw=True, return_ids=False, return_dates=False):
-        logging.warning(f"Fetching DB: all channels")
+        logging.warning(f"Fetching DB: all channels for their ids and dates")
 
         res_raw = g.run(
             """MATCH (c:Channel)
@@ -351,7 +398,7 @@ class Channel:
 
 
     def merge_in_db(self):
-        self.log("merging")
+        self.log("merging channel props in db")
         g.run(
             """MERGE (c:Channel {id: {id}})
             SET c += {props}
@@ -359,6 +406,36 @@ class Channel:
             id=self.id,
             props=self.backup_props
         )
+
+
+    def blocks_from_api(self):
+        res = []
+        per = 100
+        current_page = 0
+        total_pages = 1
+
+        while (current_page < total_pages):
+            self.log(f"Fetching API: all blocks for this channel: page {str(current_page + 1)}/{str(total_pages)}")
+        
+            response = requests.request(
+                "GET",
+                "http://api.are.na/v2/channels/" + str(self.id),
+                timeout=60,
+                headers={"Authorization": "Bearer " + API_TOKEN},
+                params={"per": per, "page": current_page + 1},
+            )
+            r = response.json()
+
+            res += r['contents']
+
+            current_page += 1
+            total_pages = math.ceil(r['length'] / per)
+
+        self.log(f"Done fetching API: {str(len(res))} blocks")
+        if len(res) != r['length']:
+            logging.warning(f"Promised {str(r['length'])} blocks but gotten {str(len(res))}")
+
+        return res
 
 
     def __create_block_channel_relationships(self):
@@ -388,8 +465,8 @@ class Channel:
     def backup_blocks(self, cutoff_date=None):
         self.log("starting backup of blocks")
         
-        blocks_from_api = Block.fetch_all_from_api(channel_id=self.id)
-        _, all_block_ids_from_db = Block.fetch_all_from_db(return_raw=False, return_ids=True)
+        blocks_from_api = self.blocks_from_api()
+        _, all_block_ids_from_db, _ = Block.fetch_all_from_db(return_raw=False, return_ids=True, return_dates=False)
 
         self.__delete_block_channel_relationships()
         self._block_relationships_to_create = []
@@ -399,7 +476,7 @@ class Channel:
             self._block_relationships_to_create.append(b.id)
 
             if (b.id not in all_block_ids_from_db):
-                b.merge_in_db()
+                b.save()
 
         self.__create_block_channel_relationships()
 
@@ -415,19 +492,15 @@ class Block:
         self.class_ = block['class'] if 'class' in block else None
         self.created_at = datetime.strptime(block['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ') if 'created_at' in block else None
         self.updated_at = datetime.strptime(block['updated_at'], '%Y-%m-%dT%H:%M:%S.%fZ') if 'updated_at' in block else None
-        self._other_backup_props = {}
+        self._gcs_props = {}
 
 
     @classmethod
     def from_api(cls, block_id):
-        res = self.fetch_one_from_api(block_id)
+        res = cls.fetch_one_from_api(block_id)
         return cls(res)
 
 
-    def dotest(self):
-        self._other_backup_props['aaaaaasthsth'] = "mydoodee"
-        self._other_backup_props['aaaaaaqweqwe'] = 123123
-    
     @property
     def backup_props(self):
         props = self._block
@@ -435,7 +508,7 @@ class Block:
             del props['contents']
         if 'connections' in props:
             del props['connections']
-        return {**flatten(props), **self._other_backup_props}
+        return {**flatten(props), **self._gcs_props}
 
     @property
     def cutoff_date(self):
@@ -443,8 +516,8 @@ class Block:
 
 
     @staticmethod
-    def fetch_all_from_db(return_raw=True, return_ids=False):
-        logging.warning(f"Fetching DB: all blocks")
+    def fetch_all_from_db(return_raw=True, return_ids=False, return_dates=False):
+        logging.warning(f"Fetching DB: all blocks for their ids")
 
         res_raw = g.run(
             """MATCH (c:Block)
@@ -453,11 +526,13 @@ class Block:
         ).data()
 
         res_ids = [ o['id'] for o in res_raw ] if return_ids else None
+        
+        res_dates = None
 
         if not return_raw:
             res_raw = None
 
-        return res_raw, res_ids
+        return res_raw, res_ids, res_dates
 
 
     @staticmethod
@@ -509,7 +584,7 @@ class Block:
 
 
     def merge_in_db(self):
-        self.log("merging")
+        self.log("merging block props in db")
         g.run(
             """MERGE (b:Block {id: {id}})
             SET b += {props}
@@ -517,6 +592,11 @@ class Block:
             id=self.id,
             props=self.backup_props
         )
+
+
+    def save(self):
+
+        self.merge_in_db()
 
 
 
