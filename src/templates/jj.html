@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@12.0.0/dist/lazyload.min.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css?family=Barlow:300,400&display=swap');
+
+        html, body {
+            font-family: "Barlow", sans-serif !important;
+            font-size: 13px;
+        }
+        body {
+            padding: 5rem;
+        }
+        .wrapper {
+            width: 100%;
+            background-color: #fff;
+            color: #444;
+            display: grid;
+            grid-gap: 2rem;
+            grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
+            grid-template-rows: repeat(auto-fill, minmax(220px,1fr));
+            justify-items: center;
+            align-items: center;
+        }
+        .block {
+            width: 220px;
+            height: 220px;
+            border: 1px solid #ccc;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+        }
+        .channel, .image, .text, .link, .media, .attachment, .overlay {
+            grid-area: 1 / 1 / 2 / 2;
+        }
+        .channel, .image {
+            justify-self: center;
+            align-self: center;
+        }
+        .channel {
+            padding: 1rem;
+        }
+        .channel p {
+            margin: 0 0 .25em;
+            text-align: center;
+        }
+        .channel .title.public {
+            color:green;
+        }
+        .channel .title.private {
+            color:red;
+        }
+        .channel .title.closed {
+            color:blue;
+        }
+        .channel .title {
+            font-size: 1.5rem;
+            font-weight: 300;
+        }
+        .block img {
+            max-width: 220px;
+            max-height: 220px;
+        }
+        .text {
+            padding: .5rem;
+        }
+
+        .block .overlay {
+            justify-self: stretch;
+            align-self: stretch;
+            background: rgba(255, 255, 255, 0.9);
+            visibility: hidden;
+            width: 220px;
+            height: 220px;
+            display: grid;
+        }
+        .block:hover .overlay {
+            visibility: visible;
+        }
+        .overlay .info {
+            justify-self: center;
+            align-self: center;
+        }
+    </style>
+</head>
+<body>
+
+
+<div class="wrapper">
+
+    {% for block in blocks %}
+
+    <div class="block">
+        <div class="{{ block.data.class|lower }}">
+
+            {% if block.data.class == "Channel" %}
+            <p class="title {{ block.data.status }}">{{ block.data.title }}</p>
+            <p class="author">by {{ block.data.user_full_name }}</p>
+            <p class="count">{{ block.data.length }} blocks</p>
+            {% endif %}
+
+            {% if block.data.class in ["Image", "Link", "Media"] %}
+            <img class="lazy" data-src="{{ block.data.gcs_image_original_url }}" />
+            {% endif %}
+
+            {% if block.data.class == "Text" %}
+            {{ block.data.content }}
+            {% endif %}
+        </div>
+        <div class="overlay">
+            <div class="info">
+                <!-- <i class="fa fa-camera-retro"></i> -->
+                {{ block.data.class }}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+
+    <script>
+        (function() {
+            var ll = new LazyLoad({
+                elements_selector: ".lazy"
+            });
+        })();
+    </script>
+</body>
+</html>

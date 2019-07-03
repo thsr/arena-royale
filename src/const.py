@@ -1,0 +1,16 @@
+API_TOKEN = "c3e339b184646e3fc8c6ee102c801b03a7d77282bd07d28112250b1cdf9d46d9"
+# CHANNELS_TO_TEST = [142063, 419718, 422143, 422144, 411952    159627]
+DEFAULT_USER_ID=33234
+CHANNELS_TO_TEST = [
+    142063, #q1e
+    419718, #dev
+    422143, #flask
+    422144, #py
+    411952, #TEXT
+    # 159627, #DRAWING
+]
+
+GCS_PROJECT="thsr-project"
+GCS_BUCKET="thsr-bucket"
+GCS_ARCHIVE_FOLDER="arena_royale_archive"
+GCS_CRED_FILE="./gcskey.json"
