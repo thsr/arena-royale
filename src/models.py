@@ -1,5 +1,6 @@
 from datetime import datetime
 import math
+import os
 import requests
 
 
@@ -155,7 +156,7 @@ class User:
         self.__delete_user_channel_relationships()
         self._channel_relationships_to_create = []
 
-        for channel in channels_from_api:
+        for channel in reversed(channels_from_api):
             c = Channel(channel)
             self._channel_relationships_to_create.append(c.id)
 
@@ -348,7 +349,7 @@ class Channel:
         self.__delete_block_channel_relationships()
         self._block_relationships_to_create = []
 
-        for block in blocks_from_api:
+        for block in reversed(blocks_from_api):
             b = Block(block)
             self._block_relationships_to_create.append(b.id)
 
@@ -476,7 +477,7 @@ class Block:
         # TODO youtube dl only for youtube.com/watch dailymotion vimeo/watch etc..
 
         # image_original stuff
-        if self._block['class'] in ["Image", "Link", "Media"]:
+        try:
             url = self._block['image']['original']['url']
             ext = extract_file_extension(url)
             destination = os.path.join(const.GCS_ARCHIVE_FOLDER, str(self._block['id']) + ext)
@@ -487,5 +488,7 @@ class Block:
             else:
                 self.log("GCS already exists")
                 self._gcs_props['gcs_image_original_url'] = gc_stuff.get_public_url(destination)
+        except Exception:
+            pass
 
         self.merge_in_db()

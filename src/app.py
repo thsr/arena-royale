@@ -19,6 +19,24 @@ app = Flask(__name__)
 
 # routes
 # ======
+@app.route('/all')
+def route_all():
+    if request.args.get('channel'):
+        res = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel {id: {channel_id}})
+            RETURN b as data, collect({id: c.id, title: c.title, slug: c.slug, user_slug: c.user_slug, status: c.status}) as channels
+            ORDER BY b.connected_at DESC
+            LIMIT 200""",
+            channel_id=int(request.args.get('channel')),
+        ).data()
+    else:
+        res = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel)
+            RETURN b as data, collect({id: c.id, title: c.title, slug: c.slug, user_slug: c.user_slug, status: c.status}) as channels
+            ORDER BY b.connected_at DESC
+            LIMIT 200"""
+        ).data()
+    return render_template('jj.html', blocks=res)
+
+
 @app.route('/c', methods=['POST'])
 def route_c():
     if request.method == 'POST':
@@ -83,9 +101,12 @@ def route_i():
 
 
 query_1 = """MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel)
-        RETURN b as data, collect({id: c.id, title: c.title}) as channels
+        //WHERE c.id in [418567, 419718]
+        //WHERE b.class = "Media"
+        WHERE b.id in [4399660, 3565547, 576903, 4399661, 4467723] //high connected
+        RETURN b as data, collect({id: c.id, title: c.title, slug: c.slug, user_slug: c.user_slug, status: c.status}) as channels
         ORDER BY b.connected_at DESC
-        LIMIT 5000"""
+        LIMIT 200"""
 
 
 @app.route('/j')

@@ -1,6 +1,7 @@
 from google.cloud import storage
 import os
 from urllib.parse import urlparse
+import requests
 
 
 
