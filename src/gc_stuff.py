@@ -6,11 +6,6 @@ import requests
 
 
 
-import const
-
-
-
-
 class GCStuff:
     def __init__(self, cred_file, bucket):
         self.storage_client = storage.Client.from_service_account_json(cred_file)
@@ -41,4 +36,4 @@ class GCStuff:
 
 
 
-gc_stuff = GCStuff(const.GCS_CRED_FILE, const.GCS_BUCKET)
+gc_stuff = GCStuff(os.environ.get('GCS_CRED_FILE'), os.environ.get('GCS_BUCKET'))
