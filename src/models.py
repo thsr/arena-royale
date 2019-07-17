@@ -25,13 +25,13 @@ class Backup:
         g.run("MATCH (n) DETACH DELETE n")
 
     def redo_user(self):
-        u = User.from_api(user_id=const.DEFAULT_USER_ID)
+        u = User.from_api(user_id=os.environ.get('ARENA_USER_ID'))
         u.merge_in_db()
 
     def go_for_it(self, test_mode=True):
-        logging.warning("starting backup, starting at user node, user_id " + str(const.DEFAULT_USER_ID))
+        logging.warning("starting backup, starting at user node, user_id " + str(os.environ.get('ARENA_USER_ID')))
 
-        u = User.from_api(user_id=const.DEFAULT_USER_ID)
+        u = User.from_api(user_id=os.environ.get('ARENA_USER_ID'))
 
         u.merge_in_db()
 

@@ -8,9 +8,9 @@ services:
       - 7474
       - 7687
     # optionnally expose http and bolt on the host:
-    ports:
-      - '7474:7474'
-      - '7687:7687'
+    # ports:
+    #   - '7474:7474'
+    #   - '7687:7687'
     volumes:
       - ./neo4j-data:/data
       - ./neo4j-logs:/logs
@@ -29,8 +29,9 @@ services:
       - ./src:/app
     restart: unless-stopped
 
-  # crontab:
-  #   build: ./crontab
-  #   depends_on:
-  #     - pythonflask
-  #   restart: unless-stopped
+  crontab:
+    build: ./crontab
+    env_file: .env
+    depends_on:
+      - pythonflask
+    restart: unless-stopped
