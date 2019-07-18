@@ -19,7 +19,7 @@ services:
   pythonflask:
     depends_on:
       - neo4j
-    build: .
+    build: ./src
     env_file: .env
     expose:
       - 80
