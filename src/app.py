@@ -38,7 +38,7 @@ def backup():
 
 @app.route('/all')
 def route_all():
-    limit = request.args.get('limit') or 50
+    limit = request.args.get('limit') or 500
     limit = int(limit)
     skip = request.args.get('skip') or 0
     skip = int(skip)

@@ -18,17 +18,21 @@ class Backup:
     def __init__(self):
         pass
 
-    def clear_logfile(self):
+    @staticmethod
+    def clear_logfile():
         open('./app.log', 'w').close()
 
-    def clear_db(self):
+    @staticmethod
+    def clear_db():
         g.run("MATCH (n) DETACH DELETE n")
 
-    def redo_user(self):
+    @staticmethod
+    def redo_user():
         u = User.from_api(user_id=os.environ.get('ARENA_USER_ID'))
         u.merge_in_db()
 
-    def go_for_it(self, test_mode=True):
+    @staticmethod
+    def go_for_it(test_mode=True):
         logging.warning("starting backup, starting at user node, user_id " + str(os.environ.get('ARENA_USER_ID')))
 
         u = User.from_api(user_id=os.environ.get('ARENA_USER_ID'))
