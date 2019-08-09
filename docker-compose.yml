@@ -24,7 +24,7 @@ services:
     expose:
       - 80
     ports:
-      - '5000:80'
+      - '5036:80'
     volumes:
       - ./src:/app
     restart: unless-stopped
