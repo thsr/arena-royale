@@ -36,12 +36,16 @@ def backup():
         return "ok"
 
 
-@app.route('/all')
-def route_all():
-    limit = request.args.get('limit') or 500
-    limit = int(limit)
-    skip = request.args.get('skip') or 0
-    skip = int(skip)
+@app.route('/blocks')
+@app.route('/blocks/<int:page>')
+def route_all(page=1):
+    per = request.args.get('per') or 500
+    try:
+        limit = int(per)
+    except ValueError:
+        limit = 500
+    
+    skip = (page - 1) * limit
     
     if request.args.get('channel'):
         res = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel {id: {channel_id}})
@@ -63,7 +67,7 @@ def route_all():
             limit=limit,
         ).data()
 
-    return render_template('jj.html', blocks=res)
+    return render_template('blocks.html', blocks=res)
 
 
 

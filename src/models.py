@@ -4,14 +4,15 @@ import os
 import requests
 
 
-
-
 import const
 from utils import logging, flatten, extract_file_extension
 from db import g
 from gc_stuff import gc_stuff
 
 
+ARENA_USER_ID = os.environ.get('ARENA_USER_ID')
+ARENA_API_TOKEN = os.environ.get('ARENA_API_TOKEN')
+GCS_ARCHIVE_FOLDER = os.environ.get('GCS_ARCHIVE_FOLDER')
 
 
 class Backup:
@@ -28,14 +29,14 @@ class Backup:
 
     @staticmethod
     def redo_user():
-        u = User.from_api(user_id=os.environ.get('ARENA_USER_ID'))
+        u = User.from_api(user_id=ARENA_USER_ID)
         u.merge_in_db()
 
     @staticmethod
     def go_for_it(test_mode=True):
-        logging.warning("starting backup, starting at user node, user_id " + str(os.environ.get('ARENA_USER_ID')))
+        logging.warning("starting backup, starting at user node, user_id " + str(ARENA_USER_ID))
 
-        u = User.from_api(user_id=os.environ.get('ARENA_USER_ID'))
+        u = User.from_api(user_id=ARENA_USER_ID)
 
         u.merge_in_db()
 
@@ -81,7 +82,7 @@ class User:
             "GET",
             "https://api.are.na/v2/users/" + str(user_id),
             timeout=60,
-            headers={"Authorization": "Bearer " + os.environ.get('ARENA_API_TOKEN')},
+            headers={"Authorization": "Bearer " + ARENA_API_TOKEN},
         )
         r = response.json()
         return r
@@ -99,7 +100,7 @@ class User:
                 "GET",
                 "https://api.are.na/v2/users/" + str(self.id) + "/channels",
                 timeout=60,
-                headers={"Authorization": "Bearer " + os.environ.get('ARENA_API_TOKEN')},
+                headers={"Authorization": "Bearer " + ARENA_API_TOKEN},
                 params={"per": per, "page": current_page + 1},
             )
             r = response.json()
@@ -262,7 +263,7 @@ class Channel:
                 "GET",
                 "https://api.are.na/v2/users/" + str(user_id) + "/channels",
                 timeout=60,
-                headers={"Authorization": "Bearer " + os.environ.get('ARENA_API_TOKEN')},
+                headers={"Authorization": "Bearer " + ARENA_API_TOKEN},
                 params={"per": per, "page": current_page + 1},
             )
             r = response.json()
@@ -303,7 +304,7 @@ class Channel:
                 "GET",
                 "http://api.are.na/v2/channels/" + str(self.id),
                 timeout=60,
-                headers={"Authorization": "Bearer " + os.environ.get('ARENA_API_TOKEN')},
+                headers={"Authorization": "Bearer " + ARENA_API_TOKEN},
                 params={"per": per, "page": current_page + 1},
             )
             r = response.json()
@@ -425,7 +426,7 @@ class Block:
             "GET",
             "https://api.are.na/v2/blocks/" + str(block_id),
             timeout=60,
-            headers={"Authorization": "Bearer " + os.environ.get('ARENA_API_TOKEN')},
+            headers={"Authorization": "Bearer " + ARENA_API_TOKEN},
         )
         r = response.json()
         return r
@@ -445,7 +446,7 @@ class Block:
                 "GET",
                 "http://api.are.na/v2/channels/" + str(channel_id),
                 timeout=60,
-                headers={"Authorization": "Bearer " + os.environ.get('ARENA_API_TOKEN')},
+                headers={"Authorization": "Bearer " + ARENA_API_TOKEN},
                 params={"per": per, "page": current_page + 1},
             )
             r = response.json()
@@ -484,7 +485,7 @@ class Block:
         try:
             url = self._block['image']['original']['url']
             ext = extract_file_extension(url)
-            destination = os.path.join(os.environ.get('GCS_ARCHIVE_FOLDER'), str(self._block['id']) + ext)
+            destination = os.path.join(GCS_ARCHIVE_FOLDER, str(self._block['id']) + ext)
             if not gc_stuff.check_if_file_exists(destination):
                 self.log("uploading image_original to GCS")
                 gcs_url = gc_stuff.upload_to_gcs(url, destination, make_public=True)

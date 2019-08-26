@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% block head %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css?family=Barlow:300,400&display=swap');
+
+        html, body {
+            font-family: "Barlow", sans-serif !important;
+            font-size: 13px;
+            color:#777;
+        }
+        a {
+            color: #333;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #000;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        /* .wrapper {
+            max-width: 1024px;
+            margin: 0 auto;
+            font: 1.2em Helvetica, arial, sans-serif;
+        } */
+        .wrapper > * {
+            border: 1px solid #eee;
+            /* background-color: #ffec99; */
+            border-radius: 1rem;
+            padding: 2rem;
+        }
+        nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .wrapper {
+            display: grid;
+            grid-template-columns: repeat(12, [col-start] 1fr);
+            grid-gap: 2rem;
+        }
+        .wrapper > * {
+            grid-column: col-start / span 12;
+        }
+        @media (min-width: 500px) {
+            .sidebar {
+                grid-column: col-start / span 3;
+                grid-row: 3;
+            }
+            .ad {
+                grid-column: col-start / span 3;
+                grid-row: 4;
+            }
+            .content, .main-footer {
+                grid-column: col-start 4 / span 9;
+            }
+            nav ul {
+                display: flex;
+                justify-content: space-between;
+            }
+        }
+        @media (min-width: 700px) {
+            .main-nav {
+                grid-column: col-start / span 2;
+                grid-row: 2 / 4;
+            }
+            .content {
+                grid-column: col-start 3 / span 8;
+                grid-row: 2 / 4;
+            }
+            .sidebar {
+                grid-column: col-start 11 / span 2;
+                grid-row: 2;
+            }
+            .ad {
+                grid-column: col-start 11 / span 2;
+                grid-row: 3;
+            }
+            .main-footer {
+                grid-column: col-start / span 12;
+            }
+            nav ul {
+                flex-direction: column;
+            }
+        }
+
+    </style>
+    {% endblock %}
+</head>
+<body>
+
+
+
+
+    <div class="wrapper">
+        <header class="main-head">The header</header>
+        <nav class="main-nav">
+            <ul>
+                <li><a href="">Nav 1</a></li>
+                <li><a href="">Nav 2</a></li>
+                <li><a href="">Nav 3</a></li>
+            </ul>
+        </nav>
+        <main class="content">
+                {% block content %}{% endblock %}
+        </main> 
+        <aside class="sidebar">Sidebar</aside>
+        <div class="ad">Advertising</div>
+        <footer class="main-footer">The footer</footer>
+    </div>
+
+    {% block before_end_body %}{% endblock %}
+</body>
+</html>

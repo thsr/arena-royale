@@ -4,8 +4,6 @@ from urllib.parse import urlparse
 import requests
 
 
-
-
 class GCStuff:
     def __init__(self, cred_file, bucket):
         self.storage_client = storage.Client.from_service_account_json(cred_file)
@@ -32,8 +30,6 @@ class GCStuff:
 
     def get_public_url(self, file):
         return self.bucket.blob(file).public_url
-
-
 
 
 gc_stuff = GCStuff(os.environ.get('GCS_CRED_FILE'), os.environ.get('GCS_BUCKET'))
