@@ -62,7 +62,7 @@ def route_all(page=1):
 
     channels = g.run("""MATCH (c:Channel)
         RETURN c.id as id, c.title as title, c.status as status
-        ORDER BY c.updated_at DESC""",
+        ORDER BY c.added_to_at DESC""",
     ).data()
 
     return render_template('blocks.html', blocks=blocks, channels=channels)

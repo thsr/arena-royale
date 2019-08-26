@@ -13,6 +13,8 @@
             font-family: "Barlow", sans-serif !important;
             font-size: 13px;
             color:#777;
+            padding: 0;
+            margin: 0;
         }
         a {
             color: #333;
@@ -23,22 +25,13 @@
         }
         .wrapper {
             display: grid;
-            grid-gap: 2rem;
             grid-template-areas:
                 "header"
-                "nav"
                 "content"
-                "sidebar"
-                "ad"
-                "footer";
-            margin: 0;
+                "nav";
+            grid-gap: 4rem;
+            margin: 4rem;
             padding: 0;
-        }
-        .wrapper > * {
-            border: 1px solid #eee;
-            /* background-color: #ffec99; */
-            border-radius: 1rem;
-            padding: 2rem;
         }
         .header {
             grid-area: header;
@@ -48,13 +41,16 @@
         }
         .nav {
             grid-area: nav;
-            max-height: 100vh;
+            max-height: 30rem;
             overflow: scroll;
         }
         nav ul {
             list-style: none;
             margin: 0;
             padding: 0;
+        }
+        nav ul li {
+            margin: 0 0 .4rem;
         }
         .sidebar {
             grid-area: sidebar;
@@ -67,28 +63,15 @@
         }
         @media (min-width: 500px) {
             .wrapper {
-                grid-template-columns: 1fr 3fr;
+                grid-template-columns: minmax(auto, 220px) 1fr;
                 grid-template-areas:
                 "header  header"
-                "nav     content"
-                "sidebar content"
-                "ad      footer";
+                "nav     content";
             }
             .nav {
                 max-height: none;
             }
         }
-        @media (min-width: 700px) {
-            .wrapper {
-                grid-template-columns: 1fr 4fr 1fr;
-                grid-template-areas:
-                "header header  header"
-                "nav    content sidebar"
-                "nav    content ad"
-                "footer footer  footer"
-            }
-        }
-
     </style>
     {% endblock %}
 </head>
@@ -107,7 +90,7 @@
         <main class="content">
                 {% block content %}{% endblock %}
         </main> 
-        <aside class="sidebar">
+        <!-- <aside class="sidebar">
             Sidebar
         </aside>
         <div class="ad">
@@ -115,7 +98,7 @@
         </div>
         <footer class="footer">
             The footer
-        </footer>
+        </footer> -->
     </div>
 
     {% block before_end_body %}{% endblock %}
