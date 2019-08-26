@@ -123,22 +123,22 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     } */
-    .overlay .channels a.public {
+    a.public-channel {
         color:rgb(0, 180, 0);
     }
-    .overlay .channels a:hover.public {
+    a:hover.public-channel {
         color:rgb(0, 77, 0);
     }
-    .overlay .channels a.private {
+    a.private-channel {
         color:red;
     }
-    .overlay .channels a:hover.private {
+    a:hover.private-channel {
         color:darkred;
     }
-    .overlay .channels a.closed {
+    a.closed-channel {
         color:blue;
     }
-    .overlay .channels a:hover.closed {
+    a:hover.closed-channel {
         color:darkblue;
     }
     .overlay .channels a+a::before {
@@ -146,6 +146,17 @@
         color: #777;
     }
 </style>
+{% endblock %}
+
+
+
+
+{% block nav %}
+<ul>
+    {% for channel in channels %}
+    <li><a href="/blocks?channel={{ channel.id }}" class="{{ channel.status + "-channel" }}">{{channel.title}}</a></li>
+    {% endfor %}
+</ul>
 {% endblock %}
 
 
@@ -233,7 +244,7 @@
 
             <p class="channels">
                 {% for channel in block.channels -%}
-                <a title="{{ channel.title }}" class="{{ channel.status }}" href="/blocks?channel={{ channel.id }}">
+                <a title="{{ channel.title }}" class="{{ channel.status + "-channel" }}" href="/blocks?channel={{ channel.id }}">
                     {{ channel.title }}
                 </a>
                 {%- endfor %}

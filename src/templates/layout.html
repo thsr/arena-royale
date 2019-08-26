@@ -48,6 +48,8 @@
         }
         .nav {
             grid-area: nav;
+            max-height: 100vh;
+            overflow: scroll;
         }
         nav ul {
             list-style: none;
@@ -68,13 +70,12 @@
                 grid-template-columns: 1fr 3fr;
                 grid-template-areas:
                 "header  header"
-                "nav     nav"
+                "nav     content"
                 "sidebar content"
                 "ad      footer";
             }
-            nav ul {
-                display: flex;
-                justify-content: space-between;
+            .nav {
+                max-height: none;
             }
         }
         @media (min-width: 700px) {
@@ -85,9 +86,6 @@
                 "nav    content sidebar"
                 "nav    content ad"
                 "footer footer  footer"
-            }
-            nav ul {
-                flex-direction: column;
             }
         }
 
@@ -101,14 +99,10 @@
 
     <div class="wrapper">
         <header class="header">
-            The header
+            **
         </header>
         <nav class="nav">
-            <ul>
-                <li><a href="">Nav 1</a></li>
-                <li><a href="">Nav 2</a></li>
-                <li><a href="">Nav 3</a></li>
-            </ul>
+                {% block nav %}{% endblock %}
         </nav>
         <main class="content">
                 {% block content %}{% endblock %}

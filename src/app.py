@@ -1,6 +1,5 @@
 from flask import Flask, jsonify, request, Response, render_template
 
-
 import const
 from utils import flatten, logging
 from db import g
@@ -8,11 +7,7 @@ from models import Backup, User, Channel, Block
 from gc_stuff import gc_stuff
 
 
-
-
 app = Flask(__name__)
-
-
 
 
 # routes
@@ -26,7 +21,6 @@ def backup_reset():
         res = b.go_for_it(test_mode=False)
         return jsonify(res)
 
-
 @app.route('/backup', methods=['POST'])
 def backup():
     if request.method == 'POST':
@@ -34,7 +28,6 @@ def backup():
         res = b.go_for_it(test_mode=False)
         return jsonify(res)
         return "ok"
-
 
 @app.route('/blocks')
 @app.route('/blocks/<int:page>')
@@ -48,7 +41,7 @@ def route_all(page=1):
     skip = (page - 1) * limit
     
     if request.args.get('channel'):
-        res = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel {id: {channel_id}})
+        blocks = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel {id: {channel_id}})
             RETURN b as data, collect({id: c.id, title: c.title, slug: c.slug, user_slug: c.user_slug, status: c.status}) as channels
             ORDER BY b.connected_at DESC
             SKIP {skip}
@@ -58,7 +51,7 @@ def route_all(page=1):
             limit=limit,
         ).data()
     else:
-        res = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel)
+        blocks = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel)
             RETURN b as data, collect({id: c.id, title: c.title, slug: c.slug, user_slug: c.user_slug, status: c.status}) as channels
             ORDER BY b.connected_at DESC
             SKIP {skip}
@@ -67,10 +60,12 @@ def route_all(page=1):
             limit=limit,
         ).data()
 
-    return render_template('blocks.html', blocks=res)
+    channels = g.run("""MATCH (c:Channel)
+        RETURN c.id as id, c.title as title, c.status as status
+        ORDER BY c.updated_at DESC""",
+    ).data()
 
-
-
+    return render_template('blocks.html', blocks=blocks, channels=channels)
 
 
 if __name__ == '__main__':
