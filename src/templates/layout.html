@@ -21,44 +21,56 @@
         a:hover {
             color: #000;
         }
-        * {
-            box-sizing: border-box;
+        .wrapper {
+            display: grid;
+            grid-gap: 2rem;
+            grid-template-areas:
+                "header"
+                "nav"
+                "content"
+                "sidebar"
+                "ad"
+                "footer";
+            margin: 0;
+            padding: 0;
         }
-        /* .wrapper {
-            max-width: 1024px;
-            margin: 0 auto;
-            font: 1.2em Helvetica, arial, sans-serif;
-        } */
         .wrapper > * {
             border: 1px solid #eee;
             /* background-color: #ffec99; */
             border-radius: 1rem;
             padding: 2rem;
         }
+        .header {
+            grid-area: header;
+        }
+        .content {
+            grid-area: content;
+        }
+        .nav {
+            grid-area: nav;
+        }
         nav ul {
             list-style: none;
             margin: 0;
             padding: 0;
         }
-        .wrapper {
-            display: grid;
-            grid-template-columns: repeat(12, [col-start] 1fr);
-            grid-gap: 2rem;
+        .sidebar {
+            grid-area: sidebar;
         }
-        .wrapper > * {
-            grid-column: col-start / span 12;
+        .ad {
+            grid-area: ad;
+        }
+        .footer {
+            grid-area: footer;
         }
         @media (min-width: 500px) {
-            .sidebar {
-                grid-column: col-start / span 3;
-                grid-row: 3;
-            }
-            .ad {
-                grid-column: col-start / span 3;
-                grid-row: 4;
-            }
-            .content, .main-footer {
-                grid-column: col-start 4 / span 9;
+            .wrapper {
+                grid-template-columns: 1fr 3fr;
+                grid-template-areas:
+                "header  header"
+                "nav     nav"
+                "sidebar content"
+                "ad      footer";
             }
             nav ul {
                 display: flex;
@@ -66,24 +78,13 @@
             }
         }
         @media (min-width: 700px) {
-            .main-nav {
-                grid-column: col-start / span 2;
-                grid-row: 2 / 4;
-            }
-            .content {
-                grid-column: col-start 3 / span 8;
-                grid-row: 2 / 4;
-            }
-            .sidebar {
-                grid-column: col-start 11 / span 2;
-                grid-row: 2;
-            }
-            .ad {
-                grid-column: col-start 11 / span 2;
-                grid-row: 3;
-            }
-            .main-footer {
-                grid-column: col-start / span 12;
+            .wrapper {
+                grid-template-columns: 1fr 4fr 1fr;
+                grid-template-areas:
+                "header header  header"
+                "nav    content sidebar"
+                "nav    content ad"
+                "footer footer  footer"
             }
             nav ul {
                 flex-direction: column;
@@ -99,8 +100,10 @@
 
 
     <div class="wrapper">
-        <header class="main-head">The header</header>
-        <nav class="main-nav">
+        <header class="header">
+            The header
+        </header>
+        <nav class="nav">
             <ul>
                 <li><a href="">Nav 1</a></li>
                 <li><a href="">Nav 2</a></li>
@@ -110,9 +113,15 @@
         <main class="content">
                 {% block content %}{% endblock %}
         </main> 
-        <aside class="sidebar">Sidebar</aside>
-        <div class="ad">Advertising</div>
-        <footer class="main-footer">The footer</footer>
+        <aside class="sidebar">
+            Sidebar
+        </aside>
+        <div class="ad">
+            Advertising
+        </div>
+        <footer class="footer">
+            The footer
+        </footer>
     </div>
 
     {% block before_end_body %}{% endblock %}

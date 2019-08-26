@@ -116,13 +116,13 @@
         overflow: hidden;
         text-align: center;
     }
-    .overlay .channels a {
-        /* display: inline-block;
+    /* .overlay .channels a {
+        display: inline-block;
         max-width:90px;
         overflow: hidden;
         text-overflow: ellipsis;
-        white-space: nowrap; */
-    }
+        white-space: nowrap;
+    } */
     .overlay .channels a.public {
         color:rgb(0, 180, 0);
     }
@@ -233,7 +233,7 @@
 
             <p class="channels">
                 {% for channel in block.channels -%}
-                <a title="{{ channel.title }}" class="{{ channel.status }}" href="/all?channel={{ channel.id }}">
+                <a title="{{ channel.title }}" class="{{ channel.status }}" href="/blocks?channel={{ channel.id }}">
                     {{ channel.title }}
                 </a>
                 {%- endfor %}
