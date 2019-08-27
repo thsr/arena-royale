@@ -157,7 +157,7 @@ class User:
         self.log("starting backup of channels, test_mode " + ("ON" if test_mode else "OFF"))
 
         channels_from_api = self.channels_from_api()
-        _, all_channel_ids_from_db, all_channel_dates_from_db = Channel.fetch_all_from_db(return_raw=False, return_ids=True, return_dates=True)
+        _, all_channel_ids_from_db, all_channel_dates_from_db = Channel.fetch_all_from_db(returns=['ids', 'dates'])
 
         self.__delete_user_channel_relationships()
         self._channel_relationships_to_create = []
@@ -225,7 +225,11 @@ class Channel:
 
 
     @staticmethod
-    def fetch_all_from_db(return_raw=True, return_ids=False, return_dates=False):
+    def fetch_all_from_db(returns):
+        return_raw = 'raw' in returns
+        return_ids = 'ids' in returns
+        return_dates = 'dates' in returns
+
         logging.warning(f"Fetching DB: all channels for their ids and dates")
 
         res_raw = g.run(
@@ -350,7 +354,7 @@ class Channel:
         self.log("starting backup of blocks")
         
         blocks_from_api = self.blocks_from_api()
-        _, all_block_ids_from_db, _ = Block.fetch_all_from_db(return_raw=False, return_ids=True, return_dates=False)
+        _, all_block_ids_from_db, _ = Block.fetch_all_from_db(returns=['ids'])
 
         self.__delete_block_channel_relationships()
         self._block_relationships_to_create = []
@@ -401,7 +405,11 @@ class Block:
 
 
     @staticmethod
-    def fetch_all_from_db(return_raw=True, return_ids=False, return_dates=False):
+    def fetch_all_from_db(returns):
+        return_raw = 'raw' in returns
+        return_ids = 'ids' in returns
+        return_dates = 'dates' in returns
+
         logging.warning(f"Fetching DB: all blocks for their ids")
 
         res_raw = g.run(
@@ -502,7 +510,7 @@ class Block:
         # youtube-dl stuff
         try:
             source_url = self._block['source']['url']
-            if re.search(r'youtube\.[^\/]+\/watch\?v=|youtu\.be\/[A-Za-z0-9_]+', source_url)
+            if re.search(r'youtube\.[^\/]+\/watch\?v=|youtu\.be\/[A-Za-z0-9_]+', source_url):
                 ydl_opts = {'format': 'best'}
                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(source_url, download=False)
