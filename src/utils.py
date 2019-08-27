@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 
 
-logging.basicConfig(filename='./app.log',level=logging.WARNING,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+logging.basicConfig(filename='./app.2.log',level=logging.WARNING,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 
 
 
