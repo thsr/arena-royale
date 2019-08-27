@@ -1,8 +1,9 @@
 from datetime import datetime
 import math
 import os
+import re
 import requests
-
+import youtube_dl
 
 import const
 from utils import logging, flatten, extract_file_extension
@@ -463,8 +464,12 @@ class Block:
         return res
 
 
-    def log(self, message):
-        logging.warning(f"Block {str(self.class_).ljust(5)[0:5]} {str(self.id)}: {message}")
+    def log(self, message, error=False):
+        msg = f"Block {str(self.class_).ljust(5)[0:5]} {str(self.id)}: {message}"
+        if error:
+            logging.error(msg)
+        else:
+            logging.warning(msg)
 
 
     def merge_in_db(self):
@@ -479,8 +484,6 @@ class Block:
 
 
     def save(self):
-        # TODO youtube dl only for youtube.com/watch dailymotion vimeo/watch etc..
-
         # image_original stuff
         try:
             url = self._block['image']['original']['url']
@@ -495,5 +498,24 @@ class Block:
                 self._gcs_props['gcs_image_original_url'] = gc_stuff.get_public_url(destination)
         except:
             pass
+
+        # youtube-dl stuff
+        try:
+            source_url = self._block['source']['url']
+            if re.search(r'youtube\.[^\/]+\/watch\?v=|youtu\.be\/[A-Za-z0-9_]+', source_url)
+                ydl_opts = {'format': 'best'}
+                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                    info_dict = ydl.extract_info(source_url, download=False)
+                    url = info_dict.get('url')
+                    ext = '.' + info_dict.get('ext')
+                    destination = os.path.join(GCS_ARCHIVE_FOLDER, str(self._block['id']) + '_youtubedl' + ext)
+                    if not gc_stuff.check_if_file_exists(destination):
+                        self.log("youtube-dl'ing to GCS")
+                        gcs_url = gc_stuff.upload_to_gcs(url, destination, make_public=True)
+                        self._gcs_props['gcs_youtubedl_url'] = gcs_url
+                    else:
+                        self.log("youtube-dl already exists in GCS")
+        except Exception as e:
+            self.log(str(e), error=True)
 
         self.merge_in_db()
