@@ -18,6 +18,14 @@ class GCStuff:
             blob.make_public()
         return str(blob.public_url)
 
+    def upload_local_file_to_gcs(self, file, destination, make_public=False, headers=None, content_type=None):
+        """destination folder and filename has to be specified"""
+        blob = self.bucket.blob(destination)
+        blob.upload_from_filename(file, content_type=content_type)
+        if make_public:
+            blob.make_public()
+        return str(blob.public_url)
+
     def upload_to_gcs_folder(self, source_url, folder, make_public=False):
         """keeps the same filename as origin url"""
         parsed = urlparse(source_url)

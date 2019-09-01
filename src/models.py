@@ -6,7 +6,7 @@ import requests
 import youtube_dl
 
 import const
-from utils import logging, flatten, extract_file_extension
+from utils import logging, flatten, extract_file_extension, video_to_thumbnail
 from db import g
 from gc_stuff import gc_stuff
 
@@ -542,8 +542,16 @@ class Block:
                         self.log("uploading webm to GCS")
                         gcs_url = gc_stuff.upload_to_gcs(url, destination, make_public=True)
                         self._gcs_props['gcs_webm'] = gcs_url
+
+                        self.log("creating webm's thumb")
+                        thumbnail_file = video_to_thumbnail(self._block['attachment']['url'], self._block['id'])
+                        destination = os.path.join(GCS_ARCHIVE_FOLDER, '%s_webm_thumb.png' % str(self._block['id']))
+                        gcs_url = gc_stuff.upload_local_file_to_gcs(thumbnail_file, destination, make_public=True, content_type='image/png')
+                        self._gcs_props['gcs_webm_thumb'] = gcs_url
+                        os.remove(thumbnail_file)
+
                     else:
-                        self.log("GCS already exists")
+                        self.log("webm already exists")
                 except Exception as e:
                     self.log(str(e), error=True)
 

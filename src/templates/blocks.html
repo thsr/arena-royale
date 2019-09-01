@@ -193,6 +193,10 @@
             <img class="lazy" data-src="{{ block.data.image_original_url }}" />
             {% endif %}
 
+            {% if block.data.class == "Attachment" and 'gcs_webm_thumb' in block.data %}
+            <img class="lazy" data-src="{{ block.data.gcs_webm_thumb }}" />
+            {% endif %}
+
             {% if block.data.class == "Text" %}
             {{ block.data.content }}
             {% endif %}
