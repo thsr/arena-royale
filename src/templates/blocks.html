@@ -265,6 +265,15 @@
             </p>
             {% endif %}
 
+
+            {% if 'gcs_webm' in block.data %}
+            <p class="other">
+                <a href="{{ block.data.gcs_webm }}" target="_blank">
+                    <i class="fa fa-file-video-o"></i>
+                </a>
+            </p>
+            {% endif %}
+
             <p class="channels">
                 {% for channel in block.channels -%}
                 <a title="{{ channel.title }}" class="{{ channel.status + "-channel" }}" href="/blocks?channel={{ channel.id }}">

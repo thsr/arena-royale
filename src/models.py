@@ -531,4 +531,20 @@ class Block:
         except Exception as e:
             self.log(str(e), error=True)
 
+        # webm stuff
+        if self._block['class'] == 'Attachment':
+            if self._block['attachment']['content_type'] == 'video/webm':
+                try:
+                    url = self._block['attachment']['url']
+                    ext = extract_file_extension(url)
+                    destination = os.path.join(GCS_ARCHIVE_FOLDER, str(self._block['id']) + ext)
+                    if not gc_stuff.check_if_file_exists(destination):
+                        self.log("uploading webm to GCS")
+                        gcs_url = gc_stuff.upload_to_gcs(url, destination, make_public=True)
+                        self._gcs_props['gcs_webm'] = gcs_url
+                    else:
+                        self.log("GCS already exists")
+                except Exception as e:
+                    self.log(str(e), error=True)
+
         self.merge_in_db()
