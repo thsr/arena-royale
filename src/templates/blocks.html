@@ -100,6 +100,9 @@
     .overlay .source {
         grid-area: 3 / 1 / 4 / 8;
     }
+    .overlay .other {
+        grid-area: 5 / 4 / 6 / 5;
+    }
     .overlay .title, .overlay .source {
         max-width: 200px;
         overflow: hidden;
@@ -150,8 +153,20 @@
 
 
 
+{% block header %}
+<a href="https://are.na" target="_blank">&#10033;&#10033; <i class="fa fa-external-link"></i></a>
+    {% if this_channel %}
+    / <a href="https://are.na/{{ this_channel.user_slug }}/{{ this_channel.slug }}" target="_blank">{{ this_channel.title }} <i class="fa fa-external-link"></i></a>
+    {% endif %}
+{% endblock %}
+
+
+
+
 {% block nav %}
 <ul>
+    <li><a href="/blocks">All</a></li>
+    <li>&mdash;</li>
     {% for channel in channels %}
     <li><a href="/blocks?channel={{ channel.id }}" class="{{ channel.status + "-channel" }}">{{channel.title}}</a></li>
     {% endfor %}
@@ -237,6 +252,15 @@
             <p class="source">
                 <a href="{{ block.data.source_url }}" target="_blank">
                     <i class="fa fa-link"></i> {{ block.data.source_provider_name or block.data.source_url }}
+                </a>
+            </p>
+            {% endif %}
+
+
+            {% if 'gcs_youtubedl_url' in block.data %}
+            <p class="other">
+                <a href="{{ block.data.gcs_youtubedl_url }}" target="_blank">
+                    <i class="fa fa-file-video-o"></i>
                 </a>
             </p>
             {% endif %}

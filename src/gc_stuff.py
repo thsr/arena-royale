@@ -9,10 +9,10 @@ class GCStuff:
         self.storage_client = storage.Client.from_service_account_json(cred_file)
         self.bucket = self.storage_client.get_bucket(bucket)
 
-    def upload_to_gcs(self, source_url, destination, make_public=False):
+    def upload_to_gcs(self, source_url, destination, make_public=False, headers=None):
         """destination folder and filename has to be specified"""
         blob = self.bucket.blob(destination)
-        f = requests.get(source_url)
+        f = requests.get(source_url, headers=headers)
         blob.upload_from_string(data=f.content, content_type=f.headers['Content-Type'])
         if make_public:
             blob.make_public()

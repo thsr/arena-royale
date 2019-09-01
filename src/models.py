@@ -510,16 +510,21 @@ class Block:
         # youtube-dl stuff
         try:
             source_url = self._block['source']['url']
-            if re.search(r'youtube\.[^\/]+\/watch\?v=|youtu\.be\/[A-Za-z0-9_]+', source_url):
+            if ((re.search(r'youtube\.[^\/]+\/watch\?v=|youtu\.be\/[A-Za-z0-9_]+', source_url)
+                or re.search(r'motherless\.com\/[A-Za-z0-9_]+$', source_url)
+                or re.search(r'pornhub\.com\/view_video.php\?viewkey\=[A-Za-z0-9_]+$', source_url)
+                ) and self._block['description'] != 'no gcs'
+                ):
                 ydl_opts = {'format': 'best'}
                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(source_url, download=False)
                     url = info_dict.get('url')
+                    headers = info_dict.get('http_headers')
                     ext = '.' + info_dict.get('ext')
                     destination = os.path.join(GCS_ARCHIVE_FOLDER, str(self._block['id']) + '_youtubedl' + ext)
                     if not gc_stuff.check_if_file_exists(destination):
                         self.log("youtube-dl'ing to GCS")
-                        gcs_url = gc_stuff.upload_to_gcs(url, destination, make_public=True)
+                        gcs_url = gc_stuff.upload_to_gcs(url, destination, make_public=True, headers=headers)
                         self._gcs_props['gcs_youtubedl_url'] = gcs_url
                     else:
                         self.log("youtube-dl already exists in GCS")

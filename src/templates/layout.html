@@ -36,6 +36,9 @@
         .header {
             grid-area: header;
         }
+        .header .fa-external-link {
+            font-size: .7em;
+        }
         .content {
             grid-area: content;
         }
@@ -82,13 +85,13 @@
 
     <div class="wrapper">
         <header class="header">
-            **
+            {% block header %}**{% endblock %}
         </header>
         <nav class="nav">
-                {% block nav %}{% endblock %}
+            {% block nav %}{% endblock %}
         </nav>
         <main class="content">
-                {% block content %}{% endblock %}
+            {% block content %}{% endblock %}
         </main> 
         <!-- <aside class="sidebar">
             Sidebar

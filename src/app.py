@@ -50,6 +50,12 @@ def route_all(page=1):
             skip=skip,
             limit=limit,
         ).data()
+
+        this_channel = g.run("""MATCH (c:Channel {id: {channel_id}})
+            RETURN c.title as title, c.slug as slug, c.user_slug as user_slug
+            LIMIT 1""",
+            channel_id=int(request.args.get('channel')),
+        ).data()[0]
     else:
         blocks = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel)
             RETURN b as data, collect({id: c.id, title: c.title, slug: c.slug, user_slug: c.user_slug, status: c.status}) as channels
@@ -60,12 +66,14 @@ def route_all(page=1):
             limit=limit,
         ).data()
 
+        this_channel = None
+
     channels = g.run("""MATCH (c:Channel)
         RETURN c.id as id, c.title as title, c.status as status
         ORDER BY c.added_to_at DESC""",
     ).data()
 
-    return render_template('blocks.html', blocks=blocks, channels=channels)
+    return render_template('blocks.html', blocks=blocks, channels=channels, this_channel=this_channel)
 
 
 if __name__ == '__main__':
