@@ -515,8 +515,11 @@ class Block:
                 or re.search(r'xvideos\.com\/video', source_url)
                 or re.search(r'pornhub\.com\/view_video.php\?viewkey\=[A-Za-z0-9_]+$', source_url)
                 ) and self._block['description'] != 'no gcs'
-                ):
-                ydl_opts = {'format': 'best'}
+            ):
+                if re.search(r'xvideos\.com\/video', source_url):
+                    ydl_opts = {'format': 'mp4-high'}
+                else:
+                    ydl_opts = {'format': 'best'}
                 with youtube_dl.YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(source_url, download=False)
                     url = info_dict.get('url')
