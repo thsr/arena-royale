@@ -512,6 +512,7 @@ class Block:
             source_url = self._block['source']['url']
             if ((re.search(r'youtube\.[^\/]+\/watch\?v=|youtu\.be\/[A-Za-z0-9_]+', source_url)
                 or re.search(r'motherless\.com\/[A-Za-z0-9_]+$', source_url)
+                or re.search(r'xvideos\.com\/video', source_url)
                 or re.search(r'pornhub\.com\/view_video.php\?viewkey\=[A-Za-z0-9_]+$', source_url)
                 ) and self._block['description'] != 'no gcs'
                 ):
