@@ -6,7 +6,7 @@ import cv2
 from urllib.parse import urlparse
 
 
-logging.basicConfig(filename='./app.3.log',level=logging.WARNING,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+logging.basicConfig(filename='./app.4.log',level=logging.WARNING,format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 
 
 def flatten(d, parent_key='', sep='_'):
