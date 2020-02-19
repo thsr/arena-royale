@@ -37,7 +37,7 @@ def video_to_thumbnail(video_filename, id):
     video_filename = re.sub('^https', 'http', video_filename)
     cap = cv2.VideoCapture(video_filename)
     if not cap.isOpened():
-        self.log("Couldn't open webm from url", error=True)
+        logging.error("Couldn't open webm from url")
         return None
     while(True):
         # Capture frame-by-frame
