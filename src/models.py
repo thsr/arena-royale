@@ -42,6 +42,9 @@ class Backup:
         u.merge_in_db()
 
         u.backup_channels(test_mode=test_mode)
+
+        logging.warning("backup finished all ok")
+
         return "ok"
 
 

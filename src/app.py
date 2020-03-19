@@ -29,6 +29,17 @@ def backup():
         return jsonify(res)
         return "ok"
 
+@app.route('/jsonblock/<int:block_id>', methods=['GET'])
+def jsonblock(block_id):
+    res = g.run("""MATCH (b:Block {id: {block_id}})
+        RETURN b as data""",
+        block_id=block_id
+    ).data()
+    if (len(res) == 0):
+        return jsonify('nope')
+    else:
+        return jsonify(res[0]['data'])
+
 @app.route('/blocks')
 @app.route('/blocks/<int:page>')
 def route_all(page=1):
@@ -37,7 +48,7 @@ def route_all(page=1):
         limit = int(per)
     except ValueError:
         limit = 500
-    
+
     skip = (page - 1) * limit
     
     if request.args.get('channel'):
@@ -52,7 +63,7 @@ def route_all(page=1):
         ).data()
 
         this_channel = g.run("""MATCH (c:Channel {id: {channel_id}})
-            RETURN c.title as title, c.slug as slug, c.user_slug as user_slug
+            RETURN c.title as title, c.slug as slug, c.user_slug as user_slug, c.length as length
             LIMIT 1""",
             channel_id=int(request.args.get('channel')),
         ).data()[0]
@@ -73,7 +84,20 @@ def route_all(page=1):
         ORDER BY c.added_to_at DESC""",
     ).data()
 
-    return render_template('blocks.html', blocks=blocks, channels=channels, this_channel=this_channel)
+    pagination_previous_arg = '?channel=' + request.args.get('channel') if request.args.get('channel') else ''
+    pagination_previous = '/blocks/' + str(page - 1) + pagination_previous_arg if page != 1 else None
+
+    pagination_next_arg = '?channel=' + request.args.get('channel') if request.args.get('channel') else ''
+    pagination_next = '/blocks/' + str(page + 1) + pagination_next_arg if len(blocks) == 500 else None
+
+    return render_template(
+        'blocks.html',
+        blocks=blocks,
+        channels=channels,
+        this_channel=this_channel,
+        pagination_previous=pagination_previous,
+        pagination_next=pagination_next
+    )
 
 
 if __name__ == '__main__':

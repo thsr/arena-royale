@@ -5,47 +5,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>BLOCKS</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css?family=Barlow:300,400&display=swap');
 
+        :root {
+            --block-size: 250px;
+        }
+
+        html, body, div, img, ul, li {
+            border: 0;
+            margin: 0;
+            padding: 0;
+        }
+
         html, body {
-            font-family: "Barlow", sans-serif !important;
+            font-family: "NB International", Helvetica, sans-serif !important;
+            font-weight: 300;
             font-size: 13px;
-            color:#777;
+            line-height: 1.2;
+            color:#444;
             padding: 0;
             margin: 0;
+            width: 100vw;
+            height: 100vh;
         }
         a {
-            color: #333;
+            color: #000;
             text-decoration: none;
         }
         a:hover {
-            color: #000;
-        }
-        .wrapper {
-            display: grid;
-            grid-template-areas:
-                "header"
-                "content"
-                "nav";
-            grid-gap: 4rem;
-            margin: 4rem;
-            padding: 0;
-        }
-        .header {
-            grid-area: header;
-        }
-        .header .fa-external-link {
-            font-size: .7em;
+            color: #444;
         }
         .content {
-            grid-area: content;
+            box-sizing: border-box;
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: calc(100vw - 150px);
+            padding: 2rem;
         }
         .nav {
-            grid-area: nav;
-            max-height: 30rem;
-            overflow: scroll;
+            box-sizing: border-box;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 150px;
+            height: 100vh;
+            padding: 2rem;
+            background: url('/static/background.png');
+            overflow: auto;
         }
         nav ul {
             list-style: none;
@@ -53,56 +63,27 @@
             padding: 0;
         }
         nav ul li {
-            margin: 0 0 .4rem;
+            margin: 0 0 .3rem 1rem;
+            text-indent: -1rem;
         }
-        .sidebar {
-            grid-area: sidebar;
+        .nav .fa {
+            display: inline;
         }
-        .ad {
-            grid-area: ad;
-        }
-        .footer {
-            grid-area: footer;
-        }
-        @media (min-width: 500px) {
-            .wrapper {
-                grid-template-columns: minmax(auto, 220px) 1fr;
-                grid-template-areas:
-                "header  header"
-                "nav     content";
-            }
-            .nav {
-                max-height: none;
-            }
+
+        .fa-xs {
+            font-size: .7em;
         }
     </style>
     {% endblock %}
 </head>
 <body>
 
-
-
-
-    <div class="wrapper">
-        <header class="header">
-            {% block header %}**{% endblock %}
-        </header>
-        <nav class="nav">
-            {% block nav %}{% endblock %}
-        </nav>
-        <main class="content">
-            {% block content %}{% endblock %}
-        </main> 
-        <!-- <aside class="sidebar">
-            Sidebar
-        </aside>
-        <div class="ad">
-            Advertising
-        </div>
-        <footer class="footer">
-            The footer
-        </footer> -->
-    </div>
+    <nav class="nav">
+        {% block nav %}{% endblock %}
+    </nav>
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
 
     {% block before_end_body %}{% endblock %}
 </body>
