@@ -186,23 +186,18 @@
 
 {% block nav %}
 <ul>
-    <li><a href="https://are.na" target="_blank">&#10033;&#10033;</li>
-    <li>&nbsp;</li>
     {% if this_channel %}
         <li><a href="https://are.na/{{ this_channel.user_slug }}/{{ this_channel.slug }}" target="_blank">{{ this_channel.title }} ({{ this_channel.length }})</li>
     {% endif %}
     <li>
+        <a id="btnDown" href="javascript:;"><i class="fa fa-th"></i></a>
+        <a id="btnUp" href="javascript:;"><i class="fa fa-th-large"></i></a>
         {% if pagination_previous %}
-            <a href="{{ pagination_previous }}"><i class="fa fa-arrow-left"></i></a>&nbsp;&nbsp;
+             / <a href="{{ pagination_previous }}"><i class="fa fa-arrow-circle-left"></i></a>
         {% endif %}
         {% if pagination_next %}
-            <a href="{{ pagination_next }}"><i class="fa fa-arrow-right"></i></a>
+             / <a href="{{ pagination_next }}"><i class="fa fa-arrow-circle-right"></i></a>
         {% endif %}
-        &nbsp;
-    </li>
-    <li>
-        <a id="btnDown" href="javascript:;"><i class="fa fa-th"></i></a>
-        &nbsp;&nbsp;<a id="btnUp" href="javascript:;"><i class="fa fa-th-large"></i></a>
     </li>
     <li>&nbsp;</li>
     <li><a href="/blocks">All</a></li>
