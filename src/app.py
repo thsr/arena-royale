@@ -1,4 +1,6 @@
 from flask import Flask, jsonify, request, Response, render_template
+from flask_basicauth import BasicAuth
+import os
 
 import const
 from utils import flatten, logging
@@ -9,6 +11,12 @@ from gc_stuff import gc_stuff
 
 app = Flask(__name__)
 
+# basic auth
+# ==========
+app.config['BASIC_AUTH_USERNAME'] = os.environ.get('BASIC_AUTH_USERNAME')
+app.config['BASIC_AUTH_PASSWORD'] = os.environ.get('BASIC_AUTH_PASSWORD')
+
+basic_auth = BasicAuth(app)
 
 # routes
 # ======
@@ -42,6 +50,7 @@ def jsonblock(block_id):
 
 @app.route('/blocks')
 @app.route('/blocks/<int:page>')
+@basic_auth.required
 def route_all(page=1):
     per = request.args.get('per') or 500
     try:

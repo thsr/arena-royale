@@ -20,6 +20,11 @@ GCS_PROJECT=project
 GCS_BUCKET=bucket
 GCS_ARCHIVE_FOLDER=archivefolder
 GCS_CRED_FILE=./gcskey.json
+
+CRON_ENABLED=TRUE
+
+BASIC_AUTH_USERNAME=user
+BASIC_AUTH_PASSWORD=pass
 ```
 
 - `ARENA_API_TOKEN`: to obtain an API token, register an app on https://dev.are.na/.
@@ -46,6 +51,12 @@ This will:
 - start a Neo4j database and create 2 folders for Neo4j data & logs
 - run the app on `localhost:5036`
 - setup cron to call the `/backup` endpoint everyday at 4:45am UTC
+
+When adding new packages to `requirements.txt`:
+
+```bash
+$ docker-compose up --build -d
+```
 
 Usage
 -----
