@@ -21,6 +21,7 @@ basic_auth = BasicAuth(app)
 # routes
 # ======
 @app.route('/backup/reset', methods=['POST'])
+@basic_auth.required
 def backup_reset():
     if request.method == 'POST':
         b = Backup()
@@ -76,8 +77,20 @@ def route_all(page=1):
             LIMIT 1""",
             channel_id=int(request.args.get('channel')),
         ).data()[0]
+    elif request.args.get('nsfw'):
+        blocks = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel)
+            RETURN b as data, collect({id: c.id, title: c.title, slug: c.slug, user_slug: c.user_slug, status: c.status}) as channels
+            ORDER BY b.connected_at DESC
+            SKIP {skip}
+            LIMIT {limit}""",
+            skip=skip,
+            limit=limit,
+        ).data()
+
+        this_channel = None
     else:
         blocks = g.run("""MATCH (b:Block), (b)-[:CONNECTS_TO]-(c:Channel)
+            WHERE c.status <> 'private'
             RETURN b as data, collect({id: c.id, title: c.title, slug: c.slug, user_slug: c.user_slug, status: c.status}) as channels
             ORDER BY b.connected_at DESC
             SKIP {skip}

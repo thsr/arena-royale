@@ -76,8 +76,9 @@ curl -X POST localhost:5036/backup/reset
 ### Views:
 
 All backed up blocks and channels:
-- `localhost:5036/all`
-- `localhost:5036/all?skip=200&limit=50` with pagination
+- `localhost:5036/blocks`
+- `localhost:5036/blocks/<page number>` with pagination
+- `localhost:5036/blocks?nsfw=1` includes blocks from channels with "private" status
 
 All backed up blocks and channels for **\<channel id\>**:
-- `localhost:5036/all?channel=<channel id>`
+- `localhost:5036/blocks?channel=<channel id>`
