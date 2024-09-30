@@ -31,6 +31,7 @@ def backup_reset():
         return jsonify(res)
 
 @app.route('/backup', methods=['POST'])
+@basic_auth.required
 def backup():
     if request.method == 'POST':
         b = Backup()
