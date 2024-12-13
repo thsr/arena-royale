@@ -3,6 +3,6 @@ Flask-RESTful==0.3.7
 Flask-BasicAuth
 google-cloud-storage==1.16.1
 py2neo==4.3.0
-requests==2.22.0
+requests==2.31.0
 youtube-dl
 opencv-python
